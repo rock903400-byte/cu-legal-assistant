@@ -403,7 +403,7 @@ body {
 .stamp-guide-tag {
   display: inline-block;
   border: 1.5px dashed #DC2626;
-  background: rgba(220, 38, 38, 0.05);
+  background: rgba(220, 38, 38, 0.08);
   color: #DC2626;
   padding: 2px 8px;
   border-radius: 4px;
@@ -411,6 +411,7 @@ body {
   font-weight: 800;
   margin-left: 6px;
   vertical-align: middle;
+  letter-spacing: 0.5px;
 }
 
 /* 表單元件 */

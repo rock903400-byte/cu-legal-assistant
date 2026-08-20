@@ -1,7 +1,10 @@
 /**
- * 主控制器邏輯 (app.js) - 全面升級版 (金融級視覺與微交互)
+ * 主控制器邏輯 (app.js) - 全面升級版 (金融級視覺、快取防護與印章盒導引)
  * 整合：司法院訴狀、股金抵銷、身故繼承、扣薪計算機、時效 KPI 看板、Word 匯出與草稿自動暫存
  */
+
+// 儲存原始純文字供複製與下載
+let currentRawDocText = '';
 
 document.addEventListener('DOMContentLoaded', () => {
   initTabs();
@@ -252,7 +255,7 @@ function updateScriptsPreview() {
 }
 
 /* ==========================================================================
-   5. 司法院標準法催與抵銷公文生成器
+   5. 司法院標準法催與抵銷公文生成器 (含實體印鑑盒導引)
    ========================================================================== */
 function initDocGenerator() {
   const formInputs = [
@@ -316,11 +319,11 @@ function initDocGenerator() {
     });
   }
 
-  // 複製公文
+  // 複製公文 (複製原始純文字)
   const copyDocBtn = document.getElementById('btnCopyDoc');
   if (copyDocBtn) {
     copyDocBtn.addEventListener('click', () => {
-      const text = document.getElementById('docPreviewText')?.textContent || '';
+      const text = currentRawDocText || document.getElementById('docPreviewText')?.textContent || '';
       copyTextToClipboard(text, '✅ 已複製整份公文書狀全文！', copyDocBtn);
     });
   }
@@ -329,7 +332,7 @@ function initDocGenerator() {
   const downloadWordBtn = document.getElementById('btnDownloadWord');
   if (downloadWordBtn) {
     downloadWordBtn.addEventListener('click', () => {
-      const text = document.getElementById('docPreviewText')?.textContent || '';
+      const text = currentRawDocText || document.getElementById('docPreviewText')?.textContent || '';
       const docType = document.getElementById('docType')?.value || 'doc';
       const debtor = document.getElementById('docDebtorName')?.value || '債務人';
       exportToWordDoc(`${debtor}_${docType}_公文書狀`, `${debtor} 法催公文`, text);
@@ -349,7 +352,7 @@ function initDocGenerator() {
   const downloadTxtBtn = document.getElementById('btnDownloadTxt');
   if (downloadTxtBtn) {
     downloadTxtBtn.addEventListener('click', () => {
-      const text = document.getElementById('docPreviewText')?.textContent || '';
+      const text = currentRawDocText || document.getElementById('docPreviewText')?.textContent || '';
       const docType = document.getElementById('docType')?.value || 'doc';
       const debtor = document.getElementById('docDebtorName')?.value || '債務人';
       downloadFile(`${debtor}_${docType}_書狀.txt`, text, 'text/plain;charset=utf-8');
@@ -543,9 +546,22 @@ function updateDocPreview() {
       text = generatePaymentOrderDoc(data);
   }
 
+  currentRawDocText = text;
+
   const previewEl = document.getElementById('docPreviewText');
   if (previewEl) {
-    previewEl.textContent = text;
+    // 轉譯 HTML 安全字元，並將印章標籤轉為實體紅虛線印鑑盒
+    let escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    escaped = escaped
+      .replace(/\[\s*蓋社圖記\s*\(大章\)\s*\]/g, '<span class="stamp-guide-tag">㊞ 蓋社圖記 (大章)</span>')
+      .replace(/\[\s*理事長簽章\s*\(小章\)\s*\]/g, '<span class="stamp-guide-tag">㊞ 理事長簽章 (小章)</span>')
+      .replace(/\[\s*理事長：.*?\[蓋章\]/g, '<span class="stamp-guide-tag">㊞ 理事長蓋章</span>');
+
+    previewEl.innerHTML = escaped;
   }
 
   const p = Number(data.principal) || 0;
