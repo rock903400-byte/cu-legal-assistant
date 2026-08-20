@@ -14,7 +14,7 @@
     color: #000 !important;
     font-family: '標楷體', 'BiauKai', 'DFKai-SB', 'Times New Roman', serif !important;
     font-size: 13pt !important;
-    line-height: 1.8 !important;
+    line-height: 2.0 !important;
     margin: 0 !important;
     padding: 0 !important;
   }
@@ -22,9 +22,11 @@
   .navbar,
   .tab-nav,
   .nav-actions,
+  .scenario-nav-grid,
   .form-grid,
   .doc-actions-bar,
   .card-header,
+  .accordion-step-card,
   .btn,
   .toast-box,
   .app-footer,
@@ -62,14 +64,34 @@
     display: none !important;
   }
 
-  .doc-preview-pane {
-    border: none !important;
-    box-shadow: none !important;
+  .doc-preview-container {
+    width: 100% !important;
+  }
+
+  .a4-paper-wrapper {
+    background: transparent !important;
+    padding: 0 !important;
     max-height: none !important;
     overflow: visible !important;
-    font-size: 13pt !important;
-    line-height: 2.0 !important;
+    border-radius: 0 !important;
+  }
+
+  .a4-paper-sheet {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
     padding: 0 !important;
-    white-space: pre-wrap !important;
+    font-size: 13.5pt !important;
+    line-height: 2.1 !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    color: #000 !important;
+  }
+
+  .stamp-guide-tag {
+    border: 1px solid #999 !important;
+    background: transparent !important;
+    color: #666 !important;
+    font-size: 10pt !important;
   }
 }
