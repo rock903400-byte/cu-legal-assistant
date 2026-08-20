@@ -1,5 +1,6 @@
 /**
- * 主控制器邏輯 (app.js)
+ * 主控制器邏輯 (app.js) - 全面升級版
+ * 整合：司法院訴狀、股金抵銷、身故繼承、扣薪計算機、時效 KPI 看板、Word 匯出與草稿自動暫存
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -8,8 +9,10 @@ document.addEventListener('DOMContentLoaded', () => {
   initProfileSettings();
   initScriptsGenerator();
   initDocGenerator();
+  initSalaryCalculator();
   initLedger();
   initDemoDataButton();
+  restoreDrafts();
 });
 
 // Toast 提示
@@ -21,6 +24,16 @@ function showToast(msg) {
   setTimeout(() => {
     toast.classList.remove('show');
   }, 2400);
+}
+
+// 顯示草稿自動儲存指示
+function triggerDraftSavedIndicator() {
+  const ind = document.getElementById('draftSaveIndicator');
+  if (!ind) return;
+  ind.style.display = 'inline-flex';
+  setTimeout(() => {
+    ind.style.display = 'none';
+  }, 2000);
 }
 
 // 複製純文字至剪貼簿
@@ -57,8 +70,6 @@ function fallbackCopyText(text, successMsg) {
    ========================================================================== */
 function initTabs() {
   const tabBtns = document.querySelectorAll('.tab-btn');
-  const tabContents = document.querySelectorAll('.tab-content');
-
   tabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       const targetId = btn.getAttribute('data-tab');
@@ -86,6 +97,11 @@ function switchTab(tabId) {
       content.classList.remove('active');
     }
   });
+
+  if (tabId === 'tab-statute') {
+    renderLedgerKpis();
+    renderLedgerTable();
+  }
 }
 
 /* ==========================================================================
@@ -166,12 +182,17 @@ function initScriptsGenerator() {
   inputs.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
-      el.addEventListener('input', updateScriptsPreview);
-      el.addEventListener('change', updateScriptsPreview);
+      el.addEventListener('input', () => {
+        updateScriptsPreview();
+        saveScriptsDraft();
+      });
+      el.addEventListener('change', () => {
+        updateScriptsPreview();
+        saveScriptsDraft();
+      });
     }
   });
 
-  // 複製話術按鈕
   document.querySelectorAll('.btn-copy-script').forEach(btn => {
     btn.addEventListener('click', () => {
       const targetId = btn.getAttribute('data-target');
@@ -183,6 +204,16 @@ function initScriptsGenerator() {
   });
 
   updateScriptFormFromProfile();
+}
+
+function saveScriptsDraft() {
+  const data = {
+    debtorName: document.getElementById('scriptDebtorName')?.value,
+    gender: document.getElementById('scriptGender')?.value,
+    overdueMonths: document.getElementById('scriptOverdueMonths')?.value,
+    overdueAmount: document.getElementById('scriptOverdueAmount')?.value
+  };
+  saveDraft(STORAGE_KEYS.DRAFT_SCRIPT, data);
 }
 
 function updateScriptsPreview() {
@@ -208,15 +239,17 @@ function updateScriptsPreview() {
 }
 
 /* ==========================================================================
-   5. 司法院標準公文生成器
+   5. 司法院標準法催與抵銷公文生成器
    ========================================================================== */
 function initDocGenerator() {
   const formInputs = [
-    'docType', 'docCreditorName', 'docCreditorTaxId', 'docCreditorRep', 'docCreditorAddress', 'docCreditorPhone', 'docAgentName',
-    'docDebtorName', 'docDebtorId', 'docDebtorAddress',
+    'docType', 'docCreditorName', 'docCreditorTaxId', 'docCreditorRep', 'docCreditorAddress', 'docCreditorPhone', 'docAgentName', 'docAgentId',
+    'docDebtorName', 'docDebtorId', 'docDebtorAddress', 'docDebtorMemberNo',
     'docHasGuarantor', 'docGuarantorName', 'docGuarantorId', 'docGuarantorAddress',
     'docLoanDate', 'docLoanAmount', 'docPrincipal', 'docInterestRate', 'docLastPaymentDate', 'docInterestStartDate',
     'docManualInterest', 'docManualPenalty', 'docCourt',
+    'docShareAmount', 'docDividendAmount', 'docDocNo',
+    'docDeceasedDate', 'docHouseholdOffice',
     'targetBankDeposit', 'targetBankName', 'targetInsurance', 'targetSalary', 'targetEmployerName', 'targetTaxData', 'targetRealEstate',
     'docTitleCaseNo', 'docTitleCourt', 'docCaseYear', 'docCaseWord', 'docCaseNo', 'docCaseSection'
   ];
@@ -226,23 +259,27 @@ function initDocGenerator() {
     if (el) {
       el.addEventListener('input', () => {
         handleAddressAutoCourt(id);
+        validateInterestRateInput();
         updateDocPreview();
+        saveDocDraft();
       });
       el.addEventListener('change', () => {
         handleAddressAutoCourt(id);
+        validateInterestRateInput();
         updateDocTypeVisibility();
         updateDocPreview();
+        saveDocDraft();
       });
     }
   });
 
-  // 保證人開關
   const guarantorToggle = document.getElementById('docHasGuarantor');
   if (guarantorToggle) {
     guarantorToggle.addEventListener('change', () => {
       const wrap = document.getElementById('guarantorFieldsWrap');
       if (wrap) wrap.style.display = guarantorToggle.checked ? 'block' : 'none';
       updateDocPreview();
+      saveDocDraft();
     });
   }
 
@@ -259,6 +296,7 @@ function initDocGenerator() {
         document.getElementById('docManualInterest').value = est.interest;
         showToast(`💡 已為您試算 ${est.days} 天之約定利息：${est.interest.toLocaleString()} 元`);
         updateDocPreview();
+        saveDocDraft();
       } else {
         alert('請先填寫未償本金、約定年利率與利息起算日');
       }
@@ -270,7 +308,19 @@ function initDocGenerator() {
   if (copyDocBtn) {
     copyDocBtn.addEventListener('click', () => {
       const text = document.getElementById('docPreviewText')?.textContent || '';
-      copyTextToClipboard(text, '✅ 已複製整份司法院公文書狀！');
+      copyTextToClipboard(text, '✅ 已複製整份公文書狀全文！');
+    });
+  }
+
+  // 匯出 Word
+  const downloadWordBtn = document.getElementById('btnDownloadWord');
+  if (downloadWordBtn) {
+    downloadWordBtn.addEventListener('click', () => {
+      const text = document.getElementById('docPreviewText')?.textContent || '';
+      const docType = document.getElementById('docType')?.value || 'doc';
+      const debtor = document.getElementById('docDebtorName')?.value || '債務人';
+      exportToWordDoc(`${debtor}_${docType}_公文書狀`, `${debtor} 法催公文`, text);
+      showToast('📝 已匯出標準 Word (.doc) 檔案！');
     });
   }
 
@@ -293,13 +343,13 @@ function initDocGenerator() {
     });
   }
 
-  // 將當前公文案件存入 5 年時效台帳
+  // 存入 5 年時效台帳
   const saveToLedgerBtn = document.getElementById('btnSaveDocToLedger');
   if (saveToLedgerBtn) {
     saveToLedgerBtn.addEventListener('click', () => {
       const debtorName = document.getElementById('docDebtorName')?.value.trim();
       if (!debtorName) {
-        alert('請先填寫債務人姓名');
+        alert('請先填寫借款人/債務人姓名');
         return;
       }
       const record = {
@@ -307,12 +357,13 @@ function initDocGenerator() {
         debtorId: document.getElementById('docDebtorId')?.value.trim() || '',
         principal: Number(document.getElementById('docPrincipal')?.value) || 0,
         courtName: document.getElementById('docCourt')?.value || '臺中',
-        certNo: document.getElementById('docTitleCaseNo')?.value.trim() || document.getElementById('docCaseNo')?.value.trim() || '新申請案',
+        certNo: document.getElementById('docTitleCaseNo')?.value.trim() || document.getElementById('docCaseNo')?.value.trim() || '新法催案',
         issueDate: document.getElementById('docLastPaymentDate')?.value || new Date().toISOString().split('T')[0],
         guarantorName: document.getElementById('docGuarantorName')?.value.trim() || '',
         note: `自公文助手建立 (${document.getElementById('docType')?.value})`
       };
       saveRecord(record);
+      renderLedgerKpis();
       renderLedgerTable();
       showToast('🎉 已成功將案件加入 5 年消滅時效管理台帳！');
       switchTab('tab-statute');
@@ -321,6 +372,33 @@ function initDocGenerator() {
 
   updateDocFormFromProfile();
   updateDocTypeVisibility();
+}
+
+function validateInterestRateInput() {
+  const rateInput = document.getElementById('docInterestRate');
+  const alertBox = document.getElementById('rateAlertBox');
+  const badge = document.getElementById('rateWarningBadge');
+  if (!rateInput) return;
+
+  const val = Number(rateInput.value) || 0;
+  const res = validateInterestRate(val);
+
+  if (!res.isValid) {
+    if (alertBox) {
+      alertBox.textContent = res.warning;
+      alertBox.style.display = 'block';
+    }
+    if (badge) badge.style.display = 'inline-block';
+  } else {
+    if (alertBox) alertBox.style.display = 'none';
+    if (badge) badge.style.display = 'none';
+  }
+}
+
+function saveDocDraft() {
+  const data = getDocFormData();
+  saveDraft(STORAGE_KEYS.DRAFT_DOC, data);
+  triggerDraftSavedIndicator();
 }
 
 function handleAddressAutoCourt(inputId) {
@@ -339,14 +417,28 @@ function updateDocTypeVisibility() {
   const type = document.getElementById('docType')?.value || 'payment_order';
   const execWrap = document.getElementById('executionSpecificFields');
   const renewWrap = document.getElementById('renewCertSpecificFields');
+  const offsetWrap = document.getElementById('offsetSpecificFields');
+  const deceasedWrap = document.getElementById('deceasedSpecificFields');
+  const courtGroup = document.getElementById('courtSelectGroup');
+  const guarantorGroup = document.getElementById('guarantorCheckboxGroup');
 
   if (execWrap) execWrap.style.display = (type === 'execution') ? 'block' : 'none';
   if (renewWrap) renewWrap.style.display = (type === 'renew_cert') ? 'block' : 'none';
+  if (offsetWrap) offsetWrap.style.display = (type === 'offset_share' || type === 'offset_board') ? 'block' : 'none';
+  if (deceasedWrap) deceasedWrap.style.display = (type === 'household_apply' || type === 'inheritance_inquiry' || type === 'inheritance_demand') ? 'block' : 'none';
+
+  if (courtGroup) {
+    courtGroup.style.display = (type === 'offset_share' || type === 'offset_board' || type === 'household_apply') ? 'none' : 'flex';
+  }
+  if (guarantorGroup) {
+    guarantorGroup.style.display = (type === 'household_apply' || type === 'inheritance_inquiry') ? 'none' : 'block';
+  }
 }
 
 function getDocFormData() {
   const debtorAddr = document.getElementById('docDebtorAddress')?.value.trim() || '';
   let courtName = document.getElementById('docCourt')?.value || '臺中';
+  const deceasedDateVal = document.getElementById('docDeceasedDate')?.value || '2024-01-10';
 
   return {
     docType: document.getElementById('docType')?.value || 'payment_order',
@@ -356,10 +448,12 @@ function getDocFormData() {
     creditorAddress: document.getElementById('docCreditorAddress')?.value.trim() || '臺中市西區民生路 100 號',
     creditorPhone: document.getElementById('docCreditorPhone')?.value.trim() || '04-22223333',
     agentName: document.getElementById('docAgentName')?.value.trim() || '',
+    agentId: document.getElementById('docAgentId')?.value.trim() || '',
 
     debtorName: document.getElementById('docDebtorName')?.value.trim() || '張大同',
     debtorId: document.getElementById('docDebtorId')?.value.trim() || 'B123456789',
     debtorAddress: debtorAddr || '臺中市西區五權路 50 號',
+    debtorMemberNo: document.getElementById('docDebtorMemberNo')?.value.trim() || 'CU-0886',
 
     hasGuarantor: document.getElementById('docHasGuarantor')?.checked || false,
     guarantorName: document.getElementById('docGuarantorName')?.value.trim() || '',
@@ -375,6 +469,14 @@ function getDocFormData() {
     manualInterest: document.getElementById('docManualInterest')?.value || 0,
     manualPenalty: document.getElementById('docManualPenalty')?.value || 0,
     courtName: courtName,
+
+    shareAmount: document.getElementById('docShareAmount')?.value || 50000,
+    dividendAmount: document.getElementById('docDividendAmount')?.value || 2500,
+    docNo: document.getElementById('docDocNo')?.value.trim() || '中一互社催字第 115001 號',
+
+    deceasedDate: deceasedDateVal,
+    deceasedDateRoc: formatRocDate(deceasedDateVal),
+    householdOffice: document.getElementById('docHouseholdOffice')?.value.trim() || '臺中市西區戶政事務所',
 
     targets: {
       bankDeposit: document.getElementById('targetBankDeposit')?.checked ?? true,
@@ -399,12 +501,33 @@ function updateDocPreview() {
   const data = getDocFormData();
   let text = '';
 
-  if (data.docType === 'payment_order') {
-    text = generatePaymentOrderDoc(data);
-  } else if (data.docType === 'execution') {
-    text = generateExecutionDoc(data);
-  } else if (data.docType === 'renew_cert') {
-    text = generateRenewCertificateDoc(data);
+  switch (data.docType) {
+    case 'payment_order':
+      text = generatePaymentOrderDoc(data);
+      break;
+    case 'execution':
+      text = generateExecutionDoc(data);
+      break;
+    case 'renew_cert':
+      text = generateRenewCertificateDoc(data);
+      break;
+    case 'offset_share':
+      text = generateOffsetShareDoc(data);
+      break;
+    case 'offset_board':
+      text = generateOffsetBoardResolutionDoc(data);
+      break;
+    case 'household_apply':
+      text = generateHouseholdApplyDoc(data);
+      break;
+    case 'inheritance_inquiry':
+      text = generateInheritanceInquiryDoc(data);
+      break;
+    case 'inheritance_demand':
+      text = generateInheritanceDemandDoc(data);
+      break;
+    default:
+      text = generatePaymentOrderDoc(data);
   }
 
   const previewEl = document.getElementById('docPreviewText');
@@ -412,7 +535,6 @@ function updateDocPreview() {
     previewEl.textContent = text;
   }
 
-  // 更新金額中文大寫提示
   const p = Number(data.principal) || 0;
   const mi = Number(data.manualInterest) || 0;
   const mp = Number(data.manualPenalty) || 0;
@@ -424,12 +546,103 @@ function updateDocPreview() {
 }
 
 /* ==========================================================================
-   6. 5 年消滅時效鬧鐘與台帳管理
+   6. 強制執行薪資扣押計算機模組
+   ========================================================================== */
+function initSalaryCalculator() {
+  const inputs = ['salaryMonthlyIncome', 'salaryRegion', 'salaryDependents', 'salarySupportRatio'];
+  inputs.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', runSalaryCalculation);
+      el.addEventListener('change', runSalaryCalculation);
+    }
+  });
+
+  const calcBtn = document.getElementById('btnCalculateSalary');
+  if (calcBtn) {
+    calcBtn.addEventListener('click', runSalaryCalculation);
+  }
+
+  runSalaryCalculation();
+}
+
+function runSalaryCalculation() {
+  const salary = Number(document.getElementById('salaryMonthlyIncome')?.value) || 0;
+  const region = document.getElementById('salaryRegion')?.value || 'taichung';
+  const dependents = Number(document.getElementById('salaryDependents')?.value) || 0;
+  const ratio = Number(document.getElementById('salarySupportRatio')?.value) || 1.0;
+
+  const result = calculateSalaryGarnishment({
+    monthlySalary: salary,
+    regionCode: region,
+    dependentCount: dependents,
+    supportRatio: ratio
+  });
+
+  renderSalaryCalculationResult(result);
+}
+
+function renderSalaryCalculationResult(res) {
+  const wrap = document.getElementById('salaryCalcResultWrap');
+  if (!wrap) return;
+
+  let alertHtml = '';
+  if (res.isExempt) {
+    alertHtml = `<div class="alert-box danger" style="margin-bottom:14px;">${res.warningMessage}</div>`;
+  } else if (res.warningMessage) {
+    alertHtml = `<div class="alert-box info" style="margin-bottom:14px;">${res.warningMessage}</div>`;
+  }
+
+  wrap.innerHTML = `
+    ${alertHtml}
+    <div class="calc-result-box">
+      <div class="calc-row">
+        <span>債務人每月薪資總額：</span>
+        <strong>NT$ ${res.salary.toLocaleString()} 元</strong>
+      </div>
+      <div class="calc-row">
+        <span>所屬縣市 (${res.regionName}) 115 年最低生活費：</span>
+        <span>NT$ ${res.baseLivingCost.toLocaleString()} 元 / 月</span>
+      </div>
+      <div class="calc-row">
+        <span>個人法定最低生活保障基準 (1.2 倍)：</span>
+        <span>NT$ ${res.personalCost.toLocaleString()} 元 / 月</span>
+      </div>
+      <div class="calc-row">
+        <span>受扶養親屬保障支出 (${res.dependents} 人 × 比例 ${res.supportRatio})：</span>
+        <span>NT$ ${res.dependentsCost.toLocaleString()} 元 / 月</span>
+      </div>
+      <div class="calc-row" style="font-weight:700; color:var(--navy-primary);">
+        <span>債務人及扶養親屬法定生活保障總額：</span>
+        <strong>NT$ ${res.totalProtectedLivingCost.toLocaleString()} 元 / 月</strong>
+      </div>
+      <div class="calc-row">
+        <span>扣除生活費後實質可扣餘額：</span>
+        <span>NT$ ${Math.max(0, res.salary - res.totalProtectedLivingCost).toLocaleString()} 元</span>
+      </div>
+      <div class="calc-row">
+        <span>薪資三分之一法定上限 (強制執行法 115-1 條)：</span>
+        <span>NT$ ${res.maxOneThird.toLocaleString()} 元</span>
+      </div>
+
+      <div class="calc-row-highlight">
+        <div style="font-size:0.9rem; color:#064E3B; font-weight:700; margin-bottom:4px;">法院每月合法可扣押金額：</div>
+        <div style="font-size:1.8rem; font-weight:900;">NT$ ${res.garnishableAmount.toLocaleString()} 元</div>
+        <div style="font-size:0.85rem; color:#047857; margin-top:4px;">
+          債務人每月保留生活費：NT$ ${res.retainedAmount.toLocaleString()} 元
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ==========================================================================
+   7. 5 年消滅時效鬧鐘與台帳管理
    ========================================================================== */
 function initLedger() {
+  renderLedgerKpis();
   renderLedgerTable();
 
-  // 搜尋
   const searchInput = document.getElementById('ledgerSearch');
   if (searchInput) {
     searchInput.addEventListener('input', () => {
@@ -437,7 +650,6 @@ function initLedger() {
     });
   }
 
-  // 狀態篩選
   const filterSelect = document.getElementById('ledgerFilter');
   if (filterSelect) {
     filterSelect.addEventListener('change', () => {
@@ -445,7 +657,6 @@ function initLedger() {
     });
   }
 
-  // 新增憑證按鈕
   const addBtn = document.getElementById('btnAddRecord');
   if (addBtn) {
     addBtn.addEventListener('click', () => {
@@ -453,7 +664,6 @@ function initLedger() {
     });
   }
 
-  // 儲存憑證表單
   const recordForm = document.getElementById('recordForm');
   if (recordForm) {
     recordForm.addEventListener('submit', (e) => {
@@ -472,12 +682,12 @@ function initLedger() {
       };
       saveRecord(record);
       closeRecordModal();
+      renderLedgerKpis();
       renderLedgerTable();
       showToast('✅ 債權憑證案件已儲存！');
     });
   }
 
-  // 匯出全部 ICS
   const exportAllIcsBtn = document.getElementById('btnExportAllICS');
   if (exportAllIcsBtn) {
     exportAllIcsBtn.addEventListener('click', () => {
@@ -492,7 +702,6 @@ function initLedger() {
     });
   }
 
-  // 匯出 CSV
   const exportCsvBtn = document.getElementById('btnExportCSV');
   if (exportCsvBtn) {
     exportCsvBtn.addEventListener('click', () => {
@@ -505,7 +714,6 @@ function initLedger() {
     });
   }
 
-  // 匯出 JSON
   const exportJsonBtn = document.getElementById('btnExportJSON');
   if (exportJsonBtn) {
     exportJsonBtn.addEventListener('click', () => {
@@ -514,7 +722,6 @@ function initLedger() {
     });
   }
 
-  // 匯入 JSON
   const importFile = document.getElementById('importJSONFile');
   if (importFile) {
     importFile.addEventListener('change', (e) => {
@@ -525,6 +732,7 @@ function initLedger() {
         const res = importRecordsFromJSON(event.target.result);
         if (res.success) {
           showToast(`🎉 成功匯入 ${res.count} 筆台帳資料！`);
+          renderLedgerKpis();
           renderLedgerTable();
         } else {
           alert('匯入失敗：' + res.error);
@@ -533,6 +741,16 @@ function initLedger() {
       reader.readAsText(file);
     });
   }
+}
+
+function renderLedgerKpis() {
+  const metrics = getLedgerMetrics();
+  if (document.getElementById('kpiTotalCount')) document.getElementById('kpiTotalCount').textContent = metrics.total;
+  if (document.getElementById('kpiTotalPrincipal')) document.getElementById('kpiTotalPrincipal').textContent = `總債權本金 NT$ ${metrics.totalPrincipal.toLocaleString()}`;
+  if (document.getElementById('kpiUrgentCount')) document.getElementById('kpiUrgentCount').textContent = metrics.urgent;
+  if (document.getElementById('kpiWarningCount')) document.getElementById('kpiWarningCount').textContent = metrics.warning;
+  if (document.getElementById('kpiSafeCount')) document.getElementById('kpiSafeCount').textContent = metrics.safe;
+  if (document.getElementById('kpiExpiredCount')) document.getElementById('kpiExpiredCount').textContent = metrics.expired;
 }
 
 function renderLedgerTable(query = '', filterStatus = 'all') {
@@ -605,7 +823,6 @@ function downloadSingleICS(id) {
   showToast(`📅 已下載 ${r.debtorName} 之行事曆鬧鐘檔！`);
 }
 
-// 一鍵換證：帶入資料並切換至公文分頁
 function triggerRenewDoc(id) {
   const r = getRecord(id);
   if (!r) return;
@@ -617,7 +834,6 @@ function triggerRenewDoc(id) {
   if (document.getElementById('docCourt')) document.getElementById('docCourt').value = r.courtName || '臺中';
   if (document.getElementById('docGuarantorName')) document.getElementById('docGuarantorName').value = r.guarantorName || '';
 
-  // 解析案號
   if (r.certNo) {
     const m = r.certNo.match(/(\d+)\s*年度?\s*(\S+?)\s*字第?\s*(\d+)/);
     if (m) {
@@ -665,25 +881,42 @@ function editRecord(id) {
 function handleDeleteRecord(id) {
   if (confirm('確定要刪除這筆債權憑證案件嗎？')) {
     deleteRecord(id);
+    renderLedgerKpis();
     renderLedgerTable();
     showToast('🗑️ 已刪除該筆案件');
   }
 }
 
 /* ==========================================================================
-   7. Demo 範例資料一鍵填入
+   8. 草稿自動還原 (Draft Auto-restore)
+   ========================================================================== */
+function restoreDrafts() {
+  const docDraft = loadDraft(STORAGE_KEYS.DRAFT_DOC);
+  if (docDraft && docDraft.data) {
+    const d = docDraft.data;
+    if (d.docType && document.getElementById('docType')) document.getElementById('docType').value = d.docType;
+    if (d.debtorName && document.getElementById('docDebtorName')) document.getElementById('docDebtorName').value = d.debtorName;
+    if (d.debtorId && document.getElementById('docDebtorId')) document.getElementById('docDebtorId').value = d.debtorId;
+    if (d.debtorAddress && document.getElementById('docDebtorAddress')) document.getElementById('docDebtorAddress').value = d.debtorAddress;
+    if (d.principal && document.getElementById('docPrincipal')) document.getElementById('docPrincipal').value = d.principal;
+    if (d.interestRate && document.getElementById('docInterestRate')) document.getElementById('docInterestRate').value = d.interestRate;
+    updateDocTypeVisibility();
+    updateDocPreview();
+  }
+}
+
+/* ==========================================================================
+   9. Demo 範例資料一鍵填入
    ========================================================================== */
 function initDemoDataButton() {
   const demoBtn = document.getElementById('btnLoadDemoData');
   if (!demoBtn) return;
 
   demoBtn.addEventListener('click', () => {
-    // 填入話術
     if (document.getElementById('scriptDebtorName')) document.getElementById('scriptDebtorName').value = '林志明';
     if (document.getElementById('scriptOverdueMonths')) document.getElementById('scriptOverdueMonths').value = 2;
     if (document.getElementById('scriptOverdueAmount')) document.getElementById('scriptOverdueAmount').value = 36000;
 
-    // 填入公文
     if (document.getElementById('docDebtorName')) document.getElementById('docDebtorName').value = '林志明';
     if (document.getElementById('docDebtorId')) document.getElementById('docDebtorId').value = 'B120987654';
     if (document.getElementById('docDebtorAddress')) document.getElementById('docDebtorAddress').value = '臺中市南屯區公益路二段 60 號';
@@ -696,8 +929,10 @@ function initDemoDataButton() {
     if (document.getElementById('docManualInterest')) document.getElementById('docManualInterest').value = 18500;
     if (document.getElementById('docManualPenalty')) document.getElementById('docManualPenalty').value = 3000;
     if (document.getElementById('docCourt')) document.getElementById('docCourt').value = '臺中';
+    if (document.getElementById('docDebtorMemberNo')) document.getElementById('docDebtorMemberNo').value = 'CU-1092';
+    if (document.getElementById('docShareAmount')) document.getElementById('docShareAmount').value = 85000;
+    if (document.getElementById('docDividendAmount')) document.getElementById('docDividendAmount').value = 3600;
 
-    // 保證人
     const guarantorCheck = document.getElementById('docHasGuarantor');
     if (guarantorCheck) {
       guarantorCheck.checked = true;
@@ -707,7 +942,7 @@ function initDemoDataButton() {
       document.getElementById('docGuarantorAddress').value = '臺中市南屯區大墩路 80 號';
     }
 
-    // 填入台帳範例 (若目前無資料)
+    // 填入台帳範例
     const existing = loadRecords();
     if (existing.length === 0) {
       saveRecord({
@@ -730,9 +965,10 @@ function initDemoDataButton() {
         guarantorName: '',
         note: '時效即將於近期屆滿，需具狀換證'
       });
-      renderLedgerTable();
     }
 
+    renderLedgerKpis();
+    renderLedgerTable();
     updateScriptsPreview();
     updateDocPreview();
     showToast('✨ 已載入儲蓄互助社實務測試範例資料！');

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="儲蓄互助社智慧法催公文助手與 5 年時效到期鬧鐘：純前端本地運算、零個資外洩、司法院標準訴狀一鍵排版、人身保險與存款扣押、5年時效管理台帳與行事曆鬧鐘推播。">
+  <meta name="description" content="儲蓄互助社智慧法催公文助手與 5 年時效到期鬧鐘：純前端本地運算、零個資外洩、司法院標準訴狀一鍵排版、115年扣薪計算機、股金抵銷通知、拋棄繼承查詢、5年時效管理台帳與行事曆鬧鐘推播。">
   <title>儲蓄互助社 智慧法催公文助手與 5 年時效到期鬧鐘</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/print.css" media="print">
@@ -17,10 +17,13 @@
         <div class="brand-icon">⚖️</div>
         <div class="brand-text">
           <h1>儲蓄互助社 智慧法催公文助手</h1>
-          <p>司法院標準書狀排版 ｜ 5 年時效到期鬧鐘 ｜ 純前端本地運算・零個資外洩</p>
+          <p>司法院標準訴狀 ｜ 115年扣薪試算 ｜ 股金抵銷 ｜ 5 年時效鬧鐘 ｜ 純前端本地零個資外洩</p>
         </div>
       </div>
       <div class="nav-actions">
+        <span id="draftSaveIndicator" style="font-size:0.78rem; color:#86EFAC; display:none; align-items:center; gap:4px;">
+          💾 草稿已自動儲存
+        </span>
         <button type="button" class="btn btn-warning btn-sm" id="btnLoadDemoData" title="一鍵載入測試範例">
           ✨ 填入測試範例
         </button>
@@ -37,10 +40,13 @@
     <!-- 分頁選單 (Tab Navigation) -->
     <nav class="tab-nav" aria-label="功能分頁選單">
       <button type="button" class="tab-btn active" data-tab="tab-docs">
-        <span>⚖️</span> 司法院標準法催公文
+        <span>⚖️</span> 法催與抵銷公文
+      </button>
+      <button type="button" class="tab-btn" data-tab="tab-salary">
+        <span>💰</span> 強制執行扣薪試算
       </button>
       <button type="button" class="tab-btn" data-tab="tab-statute">
-        <span>⏰</span> 5 年時效鬧鐘與台帳
+        <span>⏰</span> 5 年時效看板與台帳
       </button>
       <button type="button" class="tab-btn" data-tab="tab-scripts">
         <span>📱</span> 早期溫情關懷話術
@@ -51,7 +57,7 @@
     </nav>
 
     <!-- =========================================================================
-         分頁 1：司法院標準法催公文 (Tab 1: Legal Docs)
+         分頁 1：司法院標準法催公文與抵銷公文 (Tab 1: Legal Docs)
          ========================================================================= -->
     <section class="tab-content active" id="tab-docs">
       <div class="doc-split-view">
@@ -60,24 +66,35 @@
         <div class="doc-form-pane">
           <div class="card">
             <div class="card-header">
-              <h2 class="card-title">📝 法催案件資訊填寫</h2>
+              <h2 class="card-title">📝 法催公文與案件資訊填寫</h2>
               <span class="badge badge-primary">純本機運算・無個資外洩</span>
             </div>
 
             <div class="form-grid">
               <!-- 公文類型選擇 -->
               <div class="form-group col-span-full">
-                <label for="docType">📄 選擇欲產出的司法院標準公文：</label>
+                <label for="docType">📄 選擇欲產出的公文書狀範本：</label>
                 <select id="docType" class="form-control" style="font-weight:800; color:var(--navy-accent); font-size:1.02rem;">
-                  <option value="payment_order">1. 《民事支付命令聲請狀》（民事訴訟法第 508 條）</option>
-                  <option value="execution">2. 《民事強制執行聲請狀》（含扣押保險/存款/薪資）</option>
-                  <option value="renew_cert">3. 《民事聲請換發債權憑證狀》（強制執行法第 27 條）</option>
+                  <optgroup label="【一、司法訴訟與執行程序】">
+                    <option value="payment_order">1. 《民事支付命令聲請狀》（民事訴訟法第 508 條）</option>
+                    <option value="execution">2. 《民事強制執行聲請狀》（含扣押保險/存款/薪資）</option>
+                    <option value="renew_cert">3. 《民事聲請換發債權憑證狀》（強制執行法第 27 條）</option>
+                  </optgroup>
+                  <optgroup label="【二、儲互社法定股金抵銷（儲互社法第 14 條）】">
+                    <option value="offset_share">4. 《社員逾期放款以留存股金及股息抵銷通知書》</option>
+                    <option value="offset_board">5. 《理監事會審議逾期放款行使股金抵銷權簽呈》</option>
+                  </optgroup>
+                  <optgroup label="【三、社員身故與繼承人查調催討】">
+                    <option value="household_apply">6. 《向戶政事務所申請除戶及繼承人戶籍謄本申請書》</option>
+                    <option value="inheritance_inquiry">7. 《民事聲請查詢拋棄繼承或限定繼承狀》（法院家事法庭）</option>
+                    <option value="inheritance_demand">8. 《致全體繼承人履行遺產債務催告函》</option>
+                  </optgroup>
                 </select>
               </div>
 
               <!-- 債務人基本資料 -->
               <div class="form-group">
-                <label for="docDebtorName">債務人姓名 <span style="color:#DC2626;">*</span></label>
+                <label for="docDebtorName">借款人 / 債務人姓名 <span style="color:#DC2626;">*</span></label>
                 <input type="text" id="docDebtorName" class="form-control" placeholder="例：王小明" value="張大同">
               </div>
               <div class="form-group">
@@ -90,7 +107,7 @@
               </div>
 
               <!-- 連帶保證人 (可開合) -->
-              <div class="form-group col-span-full">
+              <div class="form-group col-span-full" id="guarantorCheckboxGroup">
                 <label style="cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
                   <input type="checkbox" id="docHasGuarantor" style="width:18px; height:18px; accent-color:var(--navy-accent);">
                   <span>含連帶保證人共同求償</span>
@@ -128,7 +145,10 @@
                 <input type="number" id="docPrincipal" class="form-control" value="210000">
               </div>
               <div class="form-group">
-                <label for="docInterestRate">約定年利率 (%)</label>
+                <label for="docInterestRate">
+                  約定年利率 (%)
+                  <span id="rateWarningBadge" style="display:none; color:#DC2626; font-size:0.75rem; font-weight:800;">⚠️ 逾 16% 上限</span>
+                </label>
                 <input type="number" step="0.1" id="docInterestRate" class="form-control" value="6.5">
               </div>
               <div class="form-group">
@@ -150,9 +170,58 @@
               </div>
 
               <!-- 管轄法院 -->
-              <div class="form-group">
+              <div class="form-group" id="courtSelectGroup">
                 <label for="docCourt">管轄地方法院</label>
                 <select id="docCourt" class="form-control"></select>
+              </div>
+
+              <!-- 利率超標警示條 -->
+              <div id="rateAlertBox" class="alert-box danger col-span-full" style="display:none;"></div>
+
+              <!-- 股金抵銷專屬欄位 (儲互社法第 14 條) -->
+              <div id="offsetSpecificFields" class="col-span-full" style="display:none; border-top:2px dashed var(--border); padding-top:16px; margin-top:6px;">
+                <h3 style="font-size:1rem; font-weight:800; color:var(--navy-primary); margin-bottom:10px;">
+                  🏦 儲蓄互助社股金抵銷專用欄位（儲蓄互助社法第 14 條）：
+                </h3>
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="docDebtorMemberNo">借款人社員編號</label>
+                    <input type="text" id="docDebtorMemberNo" class="form-control" placeholder="例：CU-0886" value="CU-0886">
+                  </div>
+                  <div class="form-group">
+                    <label for="docShareAmount">留存股金餘額 (元)</label>
+                    <input type="number" id="docShareAmount" class="form-control" placeholder="例：50000" value="50000">
+                  </div>
+                  <div class="form-group">
+                    <label for="docDividendAmount">歷年未領股息 (元)</label>
+                    <input type="number" id="docDividendAmount" class="form-control" placeholder="例：2500" value="2500">
+                  </div>
+                  <div class="form-group">
+                    <label for="docDocNo">發文字號</label>
+                    <input type="text" id="docDocNo" class="form-control" value="中一互社催字第 115001 號">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 身故與繼承專屬欄位 -->
+              <div id="deceasedSpecificFields" class="col-span-full" style="display:none; border-top:2px dashed var(--border); padding-top:16px; margin-top:6px;">
+                <h3 style="font-size:1rem; font-weight:800; color:var(--navy-primary); margin-bottom:10px;">
+                  ⚰️ 社員身故與繼承人查調專用欄位：
+                </h3>
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="docDeceasedDate">借款人死亡日期</label>
+                    <input type="date" id="docDeceasedDate" class="form-control" value="2024-01-10">
+                  </div>
+                  <div class="form-group">
+                    <label for="docHouseholdOffice">申請戶政事務所名稱</label>
+                    <input type="text" id="docHouseholdOffice" class="form-control" value="臺中市西區戶政事務所">
+                  </div>
+                  <div class="form-group">
+                    <label for="docAgentId">經辦專職身分證字號 (戶籍申請用)</label>
+                    <input type="text" id="docAgentId" class="form-control" value="B221133445">
+                  </div>
+                </div>
               </div>
 
               <!-- 強制執行專屬欄位 (標的勾選清單) -->
@@ -254,8 +323,8 @@
         <div class="doc-preview-container">
           <div class="card" style="height:100%; display:flex; flex-direction:column;">
             <div class="card-header">
-              <h2 class="card-title">📄 司法院標準公文即時預覽</h2>
-              <span class="badge badge-success">A4 標準訴狀排版</span>
+              <h2 class="card-title">📄 公文書狀即時預覽</h2>
+              <span class="badge badge-success">標準排版・支援 Word 匯出</span>
             </div>
 
             <!-- 公文內容預覽區塊 -->
@@ -263,14 +332,17 @@
 
             <!-- 操作按鈕列 -->
             <div class="doc-actions-bar">
+              <button type="button" class="btn btn-word" id="btnDownloadWord" title="匯出標準 Word (.doc) 檔案">
+                📝 匯出 Word 檔
+              </button>
               <button type="button" class="btn btn-primary" id="btnCopyDoc">
                 📋 一鍵複製全文
               </button>
               <button type="button" class="btn btn-accent" id="btnPrintDoc">
-                🖨️ A4 直接列印 / 存為 PDF
+                🖨️ A4 直接列印
               </button>
               <button type="button" class="btn btn-outline" id="btnDownloadTxt">
-                💾 下載純文字
+                💾 下載 TXT
               </button>
               <button type="button" class="btn btn-warning" id="btnSaveDocToLedger" title="將此案加入 5 年時效監控台帳">
                 ⏰ 存入 5 年時效台帳
@@ -283,7 +355,84 @@
     </section>
 
     <!-- =========================================================================
-         分頁 2：5 年消滅時效鬧鐘與台帳管理 (Tab 2: Statute & Ledger)
+         分頁 2：強制執行薪資扣押計算機 (Tab 2: Salary Garnishment Calculator)
+         ========================================================================= -->
+    <section class="tab-content" id="tab-salary">
+      <div class="doc-split-view">
+        
+        <!-- 左側：扣薪參數輸入 -->
+        <div class="doc-form-pane">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">💰 強制執行薪資扣押試算機</h2>
+              <span class="badge badge-success">115 年度衛福部最新標準</span>
+            </div>
+
+            <p style="font-size:0.88rem; color:var(--sub-text); margin-bottom:16px;">
+              依據《強制執行法》第 115 條之 1 及第 122 條規定：薪資扣押原則以 1/3 為限，且扣除後餘額不得低於「當地最低生活費之 1.2 倍 ＋ 扶養親屬必要支出」。
+            </p>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="salaryMonthlyIncome">債務人每月薪資 (應領/實領) <span style="color:#DC2626;">*</span></label>
+                <input type="number" id="salaryMonthlyIncome" class="form-control" placeholder="例：38000" value="42000">
+              </div>
+
+              <div class="form-group">
+                <label for="salaryRegion">債務人居住縣市（最低生活費標準）</label>
+                <select id="salaryRegion" class="form-control" style="font-weight:700;">
+                  <option value="taichung" selected>臺中市（16,431 元/月）</option>
+                  <option value="taipei">臺北市（20,744 元/月）</option>
+                  <option value="new_taipei">新北市（17,750 元/月）</option>
+                  <option value="taoyuan">桃園市（17,186 元/月）</option>
+                  <option value="tainan">臺南市（15,515 元/月）</option>
+                  <option value="kaohsiung">高雄市（16,970 元/月）</option>
+                  <option value="taiwan_province">臺灣省各縣市 (彰投苗雲嘉屏東花宜基澎)（15,515 元/月）</option>
+                  <option value="kinmen_lienchiang">金門縣、連江縣（14,064 元/月）</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="salaryDependents">受扶養親屬人數 (未成年子女/無工作尊親屬)</label>
+                <input type="number" id="salaryDependents" class="form-control" value="1" min="0" max="10">
+              </div>
+
+              <div class="form-group">
+                <label for="salarySupportRatio">扶養責任分攤比例</label>
+                <select id="salarySupportRatio" class="form-control">
+                  <option value="1.0">100% 獨自撫養 (比例 1.0)</option>
+                  <option value="0.5" selected>與配偶共同撫養 (各負擔 50% / 比例 0.5)</option>
+                  <option value="0.33">三名扶養義務人均分 (比例 0.33)</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="margin-top:20px; display:flex; gap:10px;">
+              <button type="button" class="btn btn-primary" id="btnCalculateSalary">
+                ⚡ 立即精算合法扣押額度
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右側：試算結果呈現 -->
+        <div class="doc-preview-container">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">📊 扣押額度與生活保障試算明細</h2>
+            </div>
+
+            <div id="salaryCalcResultWrap">
+              <!-- 動態由 JavaScript 計算呈現 -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         分頁 3：5 年消滅時效鬧鐘與台帳管理 (Tab 3: Statute & Ledger)
          ========================================================================= -->
     <section class="tab-content" id="tab-statute">
       <div class="card">
@@ -311,6 +460,35 @@
               📂 匯入備份
               <input type="file" id="importJSONFile" accept=".json" style="display:none;">
             </label>
+          </div>
+        </div>
+
+        <!-- KPI 警戒指標看板 (Statute KPI Metrics) -->
+        <div class="kpi-grid" id="ledgerKpiGrid">
+          <div class="kpi-card kpi-total">
+            <div class="kpi-label">總列管憑證數</div>
+            <div class="kpi-val" id="kpiTotalCount">0</div>
+            <div class="kpi-sub" id="kpiTotalPrincipal">總債權本金 NT$ 0</div>
+          </div>
+          <div class="kpi-card kpi-urgent">
+            <div class="kpi-label">🔴 90天內緊急換證</div>
+            <div class="kpi-val" id="kpiUrgentCount" style="color:#DC2626;">0</div>
+            <div class="kpi-sub">請立即具狀聲請換證</div>
+          </div>
+          <div class="kpi-card kpi-warning">
+            <div class="kpi-label">🟡 180天內時效預警</div>
+            <div class="kpi-val" id="kpiWarningCount" style="color:#D97706;">0</div>
+            <div class="kpi-sub">半年內屆滿，準備書狀</div>
+          </div>
+          <div class="kpi-card kpi-safe">
+            <div class="kpi-label">🟢 安全期 (>180天)</div>
+            <div class="kpi-val" id="kpiSafeCount" style="color:#15803D;">0</div>
+            <div class="kpi-sub">時效狀態正常維護中</div>
+          </div>
+          <div class="kpi-card kpi-expired">
+            <div class="kpi-label">⚫ 已逾 5 年時效</div>
+            <div class="kpi-val" id="kpiExpiredCount" style="color:#475569;">0</div>
+            <div class="kpi-sub">可能已罹於時效消滅</div>
           </div>
         </div>
 
@@ -355,7 +533,7 @@
     </section>
 
     <!-- =========================================================================
-         分頁 3：早期溫情關懷話術 (Tab 3: Early Care Scripts)
+         分頁 4：早期溫情關懷話術 (Tab 4: Early Care Scripts)
          ========================================================================= -->
     <section class="tab-content" id="tab-scripts">
       <div class="doc-split-view">
@@ -474,7 +652,7 @@
     </section>
 
     <!-- =========================================================================
-         分頁 4：法催法規與實務問答 (Tab 4: Legal Reference & FAQ)
+         分頁 5：法催法規與實務問答 (Tab 5: Legal Reference & FAQ)
          ========================================================================= -->
     <section class="tab-content" id="tab-faq">
       <div class="card">
@@ -485,32 +663,41 @@
         <div style="display:flex; flex-direction:column; gap:18px;">
           
           <div class="script-card">
-            <h3 style="color:var(--navy-accent);">⚖️ 1. 強制執行如何扣押人壽保險解約金？（最高法院 108 年度台抗大字第 897 號民事大法庭裁定）</h3>
+            <h3 style="color:var(--navy-accent);">⚖️ 1. 民法約定利率 16% 上限與違約金規範（民法第 205 條）</h3>
             <p style="font-size:0.95rem; line-height:1.8; color:var(--sub-text);">
-              <b>法律重點：</b>過去保險公司常主張保單終止權屬要保人一身專屬權，執行法院無權終止。最高法院大法庭於 108 年度台抗大字第 897 號裁定正式確立：<b>執行法院於必要時，得核發執行命令終止債務人為要保人之人壽保險契約，命第三人保險公司償付解約金支付債權人</b>。<br>
+              <b>最新法規：</b>自民國 110 年 7 月 20 日起，民法第 205 條約定利率上限調降為<b>年息 16%</b>（超過部分之約定無效）。<br>
+              <b>實務操作：</b>儲互社放款規章通常訂為年息 6%~12%，但若加計違約金與遲延利息，總請求之年利率上限亦不得逾 16%，系統已內建防呆檢核。
+            </p>
+          </div>
+
+          <div class="script-card">
+            <h3 style="color:var(--navy-accent);">🏦 2. 儲互社社員逾期放款如何行使「股金抵銷權」？（儲蓄互助社法第 14 條）</h3>
+            <p style="font-size:0.95rem; line-height:1.8; color:var(--sub-text);">
+              <b>法律重點：</b>依《儲蓄互助社法》第 14 條規定：「社員有借款餘額或為保證人未清償前，不得申請退社退股；逾期放款催收時，互助社得依法以社員之股金優先抵銷其欠款。」<br>
+              <b>作業流程：</b>經專職催繳未果後，提報理監事會審議通過簽呈，並正式寄發《股金及股息抵銷借款通知書》送達社員及保證人，即可在會計帳務上辦理沖轉。
+            </p>
+          </div>
+
+          <div class="script-card">
+            <h3 style="color:var(--navy-accent);">🛡️ 3. 強制執行如何扣押人壽保險解約金？（最高法院 108 年度台抗大字第 897 號民事大法庭裁定）</h3>
+            <p style="font-size:0.95rem; line-height:1.8; color:var(--sub-text);">
+              <b>法律重點：</b>最高法院大法庭裁定確立：<b>執行法院於必要時，得核發執行命令終止債務人為要保人之人壽保險契約，命第三人保險公司償付解約金支付債權人</b>。<br>
               <b>實務操作：</b>在《強制執行聲請狀》中，勾選聲請法院囑託「中華民國人壽保險商業同業公會」查調債務人投保之保單，並載明依此大法庭裁定意旨扣押解約金（保單價值準備金）。
             </p>
           </div>
 
           <div class="script-card">
-            <h3 style="color:var(--navy-accent);">🏦 2. 如何查調債務人於全台金融機構之存款？</h3>
+            <h3 style="color:var(--navy-accent);">💼 4. 強制執行薪資扣押 1.2 倍最低生活費保障（強制執行法第 115-1 條）</h3>
             <p style="font-size:0.95rem; line-height:1.8; color:var(--sub-text);">
-              <b>法律重點：</b>債權人取得執行名義後，若不知債務人開戶銀行，得於《強制執行聲請狀》中聲請執行法院囑託<b>「中華民國銀行商業同業公會全國聯合會」</b>向全台金融機構（含本國銀行、外國銀行在台分行、中華郵政、信用合作社、農漁會信用部）統一查詢債務人之存款帳戶並核發扣押命令。
+              <b>法律重點：</b>薪資扣押以 1/3 為上限，但扣押後餘額不得低於「當地最低生活費 × 1.2 × (1 + 扶養比例)」。若債務人月薪扣除生活費後已無餘額（如月薪 24,000 撫養 2 人），依強制執行法第 122 條不得扣押，若強行聲請扣薪恐遭法院駁回或聲明異議。
             </p>
           </div>
 
           <div class="script-card">
-            <h3 style="color:var(--navy-accent);">⏰ 3. 債權憑證為什麼是 5 年消滅時效？逾期會如何？</h3>
+            <h3 style="color:var(--navy-accent);">⏰ 5. 存證信函 6 個月起訴期限與支付命令 3 個月送達失效</h3>
             <p style="font-size:0.95rem; line-height:1.8; color:var(--sub-text);">
-              <b>法律重點：</b>依《民法》第 126 條，利息之請求權時效為 5 年；另依《民法》第 137 條第 3 項，本金借款債權經換發債權憑證後，因中斷而重行起算之消滅時效期間亦為 5 年。<br>
-              <b>實務風險：</b>若超過 5 年未向法院具狀聲請換發債權憑證，債務人得於後續強制執行時主張「時效消滅抗辯權」而拒絕清償，導致<b>債權憑證淪為廢紙</b>。因此專職人員應利用本系統之 5 年時效鬧鐘，在屆滿前 6 個月即時聲請換發。
-            </p>
-          </div>
-
-          <div class="script-card">
-            <h3 style="color:var(--navy-accent);">💼 4. 強制執行薪資扣押之法定上限為何？</h3>
-            <p style="font-size:0.95rem; line-height:1.8; color:var(--sub-text);">
-              <b>法律重點：</b>依《強制執行法》第 115 條之 1 規定，對於薪資之強制執行，以扣押債務人每月得受領薪資之 1/3 為原則；惟扣押後債務人剩餘之金額，不得低於衛生福利部所公告當地當年度每人每月最低生活費之 1.2 倍（維持債務人及其共同生活之親屬生活所必需）。
+              <b>民法第 130 條：</b>寄發存證信函催告後，<b>必須於 6 個月內起訴或聲請支付命令</b>，否則時效視為不中斷。<br>
+              <b>民事訴訟法第 515 條：</b>支付命令核發後 **3 個月內不能送達債務人者，該命令失其效力**；且支付命令**不得公示送達**，若查無此人應及時改行起訴程序。
             </p>
           </div>
 
@@ -645,6 +832,7 @@
   <!-- 腳本引入 -->
   <script src="js/court-data.js"></script>
   <script src="js/core-legal.js"></script>
+  <script src="js/salary-calc.js"></script>
   <script src="js/templates.js"></script>
   <script src="js/scripts.js"></script>
   <script src="js/storage.js"></script>

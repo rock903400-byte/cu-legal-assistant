@@ -116,18 +116,18 @@ body {
 
 .tab-btn {
   flex: 1;
-  min-width: 170px;
+  min-width: 150px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 18px;
+  padding: 12px 16px;
   background: transparent;
   border: none;
   border-radius: 8px;
   color: var(--sub-text);
   font-weight: 700;
-  font-size: 0.96rem;
+  font-size: 0.94rem;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
@@ -176,6 +176,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .card-title {
@@ -185,6 +187,53 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+/* KPI 看板卡片 (Statute Metrics) */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.kpi-card {
+  background: #fff;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  transition: transform 0.15s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+}
+
+.kpi-card.kpi-total { border-top: 4px solid var(--navy-accent); }
+.kpi-card.kpi-urgent { border-top: 4px solid #DC2626; background: #FFF5F5; }
+.kpi-card.kpi-warning { border-top: 4px solid #D97706; background: #FFFDF0; }
+.kpi-card.kpi-safe { border-top: 4px solid #15803D; background: #F6FFF8; }
+.kpi-card.kpi-expired { border-top: 4px solid #475569; background: #F1F5F9; }
+
+.kpi-label {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--sub-text);
+  margin-bottom: 4px;
+}
+
+.kpi-val {
+  font-size: 1.65rem;
+  font-weight: 900;
+  color: var(--navy-primary);
+}
+
+.kpi-sub {
+  font-size: 0.76rem;
+  color: var(--muted);
+  margin-top: 2px;
 }
 
 .badge {
@@ -228,6 +277,7 @@ body {
   color: var(--ink);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
 }
 
@@ -306,15 +356,39 @@ body {
   line-height: 1.35;
 }
 
+/* 警示框 */
+.alert-box {
+  background: #FEF3C7;
+  border-left: 5px solid #D97706;
+  padding: 12px 16px;
+  border-radius: 0 8px 8px 0;
+  font-size: 0.9rem;
+  color: #78350F;
+  margin: 10px 0;
+  line-height: 1.6;
+}
+
+.alert-box.danger {
+  background: #FEE2E2;
+  border-left-color: #DC2626;
+  color: #7F1D1D;
+}
+
+.alert-box.info {
+  background: var(--navy-light);
+  border-left-color: var(--navy-accent);
+  color: var(--navy-primary);
+}
+
 /* 按鈕樣式 */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 20px;
+  padding: 10px 18px;
   border-radius: 8px;
-  font-size: 0.95rem;
+  font-size: 0.94rem;
   font-weight: 800;
   border: 1.5px solid transparent;
   cursor: pointer;
@@ -340,6 +414,14 @@ body {
   background: var(--navy-hover);
 }
 
+.btn-word {
+  background: #2B579A;
+  color: #fff;
+}
+.btn-word:hover {
+  background: #1E3F72;
+}
+
 .btn-warning {
   background: #F59E0B;
   color: #0F172A;
@@ -360,7 +442,7 @@ body {
 
 .btn-sm {
   padding: 6px 12px;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
 }
 
 /* 雙欄公文排版預覽 */
@@ -376,17 +458,17 @@ body {
   border-radius: 10px;
   padding: 24px;
   font-family: 'Times New Roman', '標楷體', 'BiauKai', 'Noto Serif TC', serif;
-  line-height: 1.8;
+  line-height: 1.85;
   font-size: 0.98rem;
   white-space: pre-wrap;
-  max-height: 700px;
+  max-height: 720px;
   overflow-y: auto;
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.04);
 }
 
 .doc-actions-bar {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-top: 14px;
   flex-wrap: wrap;
 }
@@ -431,6 +513,38 @@ body {
   margin-bottom: 12px;
 }
 
+/* 扣薪計算機結果展示區 */
+.calc-result-box {
+  background: #F0FDF4;
+  border: 1.5px solid #BBF7D0;
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 18px;
+}
+
+.calc-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dashed #CBD5E1;
+  font-size: 0.95rem;
+}
+
+.calc-row:last-child {
+  border-bottom: none;
+}
+
+.calc-row-highlight {
+  background: #DCFCE7;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #15803D;
+  margin-top: 8px;
+}
+
 /* 台帳表格 */
 .table-responsive {
   overflow-x: auto;
@@ -465,14 +579,6 @@ body {
 
 .ledger-table tbody tr:hover td {
   background: #EDF2F7;
-}
-
-.status-dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-right: 6px;
 }
 
 /* 提示與 Toast */
@@ -519,8 +625,8 @@ body {
     grid-column: span 1;
   }
   .tab-btn {
-    min-width: 140px;
-    font-size: 0.88rem;
-    padding: 10px 12px;
+    min-width: 130px;
+    font-size: 0.86rem;
+    padding: 10px 10px;
   }
 }

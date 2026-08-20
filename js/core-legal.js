@@ -1,6 +1,11 @@
 /**
  * 法律核心運算引擎 (core-legal.js)
- * 包含：中文大寫金額轉換、民法 5 年消滅時效計算、法院規費計算、選用利息試算
+ * 包含：
+ * 1. 中文大寫金額轉換
+ * 2. 民法 5 年消滅時效計算
+ * 3. 民法第 205 條 16% 利率上限檢核
+ * 4. 民法第 130 條催告 6 個月起訴時效計算
+ * 5. 法院規費計算、選用利息試算
  */
 
 /**
@@ -17,9 +22,7 @@ function toChineseCurrency(num) {
   const bigUnits = ['', '萬', '億', '兆'];
 
   let numStr = n.toString();
-  let len = numStr.length;
   let result = '';
-  let zeroCount = 0;
 
   // 切割成每 4 位一組 (個十百千)
   const groups = [];
@@ -63,6 +66,27 @@ function toChineseCurrency(num) {
 }
 
 /**
+ * 檢核約定利率是否符合民法第 205 條上限 (年息 16%)
+ */
+function validateInterestRate(rate) {
+  const r = Number(rate) || 0;
+  if (r > 16) {
+    return {
+      isValid: false,
+      rate: r,
+      maxRate: 16,
+      warning: `⚠️ 依民法第 205 條（110/7/20 修正施行），約定利率上限為年息 16%，超過部分之約定無效！目前輸入 ${r}% 已逾法定上限。`
+    };
+  }
+  return {
+    isValid: true,
+    rate: r,
+    maxRate: 16,
+    warning: ''
+  };
+}
+
+/**
  * 計算 5 年消滅時效到期日與狀態燈號
  * 依民法第 126 條 (利息 5 年) 與第 137 條第 3 項 (換發債權憑證重行起算 5 年)
  * @param {string} issueDateStr YYYY-MM-DD
@@ -81,7 +105,6 @@ function calculate5YearExpiry(issueDateStr, currentDate = new Date()) {
   }
 
   const [y, m, d] = issueDateStr.split('-').map(Number);
-  const issueDate = new Date(y, m - 1, d);
   
   // 計算 5 年後 (若為 2/29 閏日，加 5 年非閏年則自動設為 2/28)
   const targetYear = y + 5;
@@ -130,6 +153,29 @@ function calculate5YearExpiry(issueDateStr, currentDate = new Date()) {
     status,
     statusText,
     color
+  };
+}
+
+/**
+ * 依民法第 130 條計算催告後 6 個月內起訴期限
+ */
+function calculate6MonthNoticeExpiry(noticeDateStr, currentDate = new Date()) {
+  if (!noticeDateStr) return null;
+  const [y, m, d] = noticeDateStr.split('-').map(Number);
+  const noticeDate = new Date(y, m - 1, d);
+  
+  const expiryDate = new Date(noticeDate);
+  expiryDate.setMonth(expiryDate.getMonth() + 6);
+
+  const todayZero = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+  const diffTime = expiryDate.getTime() - todayZero.getTime();
+  const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  return {
+    noticeDateStr,
+    expiryDateStr: expiryDate.toISOString().split('T')[0],
+    remainingDays,
+    isExpired: remainingDays <= 0
   };
 }
 
@@ -196,7 +242,9 @@ function getCurrentRocDate() {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     toChineseCurrency,
+    validateInterestRate,
     calculate5YearExpiry,
+    calculate6MonthNoticeExpiry,
     calculateEstimatedInterest,
     calculateCourtFees,
     formatRocDate,

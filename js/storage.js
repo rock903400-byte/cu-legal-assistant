@@ -22,7 +22,10 @@ function calculate5YearExpiryHelper(dateStr) {
 
 const STORAGE_KEYS = {
   RECORDS: 'cu_legal_records_v1',
-  PROFILE: 'cu_profile_info_v1'
+  PROFILE: 'cu_profile_info_v1',
+  DRAFT_DOC: 'cu_draft_doc_form_v1',
+  DRAFT_SCRIPT: 'cu_draft_script_form_v1',
+  DRAFT_SALARY: 'cu_draft_salary_form_v1'
 };
 
 /**
@@ -34,7 +37,6 @@ function loadRecords() {
     const raw = localStorage.getItem(STORAGE_KEYS.RECORDS);
     if (!raw) return [];
     const list = JSON.parse(raw);
-    // 自動重新計算時效狀態
     return list.map(item => {
       const expiryInfo = calculate5YearExpiryHelper(item.issueDate);
       return { ...item, ...expiryInfo };
@@ -94,6 +96,64 @@ function getRecord(id) {
 }
 
 /**
+ * 計算台帳時效警戒看板 KPI 數據
+ */
+function getLedgerMetrics(records = null) {
+  const list = records || loadRecords();
+  let total = list.length;
+  let urgent = 0;   // < 90天
+  let warning = 0;  // 90 ~ 180天
+  let safe = 0;     // > 180天
+  let expired = 0;  // <= 0天
+  let totalPrincipal = 0;
+
+  list.forEach(r => {
+    totalPrincipal += Number(r.principal) || 0;
+    if (r.status === 'urgent') urgent++;
+    else if (r.status === 'warning') warning++;
+    else if (r.status === 'expired') expired++;
+    else safe++;
+  });
+
+  return {
+    total,
+    urgent,
+    warning,
+    safe,
+    expired,
+    totalPrincipal
+  };
+}
+
+/**
+ * 儲存表單草稿 (Auto-save)
+ */
+function saveDraft(key, data) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(key, JSON.stringify({
+        data,
+        savedAt: new Date().toISOString()
+      }));
+    }
+  } catch (e) {}
+}
+
+/**
+ * 載入表單草稿
+ */
+function loadDraft(key) {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
  * 載入本社預設資訊 (記住本社設定)
  */
 function loadCuProfile() {
@@ -127,7 +187,6 @@ function saveCuProfile(profile) {
 
 /**
  * 匯出單筆或全部案件為標準 iCalendar (.ics) 檔案
- * 內建 180 天 (6個月前) 及 90 天 (3個月前) 鬧鐘推播
  */
 function generateICSContent(records) {
   const recordList = Array.isArray(records) ? records : [records];
@@ -193,7 +252,61 @@ function downloadFile(filename, content, mimeType) {
 }
 
 /**
- * 匯出 CSV 台帳清冊 (支援 Excel 繁體中文 UTF-8 with BOM)
+ * 匯出 Word (.doc) 格式檔案 (標準標楷體、A4直式橫書、段落縮排)
+ */
+function exportToWordDoc(filename, title, textContent) {
+  const formattedHtml = `
+    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+    <head>
+      <meta charset='utf-8'>
+      <title>${title}</title>
+      <style>
+        @page Section1 {
+          size: 595.3pt 841.9pt; /* A4 */
+          margin: 72pt 72pt 72pt 72pt;
+          mso-header-margin: 35.4pt;
+          mso-footer-margin: 35.4pt;
+          mso-paper-source: 0;
+        }
+        div.Section1 { page: Section1; }
+        body {
+          font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'Times New Roman', serif;
+          font-size: 14pt;
+          line-height: 2.0;
+          color: #000;
+        }
+        h1 {
+          font-size: 18pt;
+          text-align: center;
+          font-weight: bold;
+          margin-bottom: 24pt;
+        }
+        p {
+          margin: 0 0 10pt;
+          text-align: justify;
+          text-justify: inter-ideograph;
+        }
+        pre {
+          font-family: inherit;
+          font-size: inherit;
+          line-height: inherit;
+          white-space: pre-wrap;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="Section1">
+        <pre>${textContent}</pre>
+      </div>
+    </body>
+    </html>
+  `;
+
+  downloadFile(`${filename}.doc`, formattedHtml, 'application/msword;charset=utf-8');
+}
+
+/**
+ * 匯出 CSV 台帳清冊
  */
 function exportRecordsToCSV(records) {
   const headers = ['案件ID', '債務人姓名', '身分證字號', '債權憑證/執行案號', '管轄法院', '債權本金', '核發日期', '5年到期日', '剩餘天數', '時效狀態', '連帶保證人', '備註'];
@@ -223,7 +336,7 @@ function exportRecordsToCSV(records) {
 function exportRecordsToJSON(records) {
   const data = {
     exportedAt: new Date().toISOString(),
-    version: '1.0',
+    version: '1.2',
     profile: loadCuProfile(),
     records: records
   };
@@ -254,13 +367,18 @@ function importRecordsFromJSON(jsonText) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
+    STORAGE_KEYS,
     loadRecords,
     saveRecord,
     deleteRecord,
     getRecord,
+    getLedgerMetrics,
+    saveDraft,
+    loadDraft,
     loadCuProfile,
     saveCuProfile,
     generateICSContent,
+    exportToWordDoc,
     exportRecordsToCSV,
     exportRecordsToJSON,
     importRecordsFromJSON
