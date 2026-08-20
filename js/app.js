@@ -1,12 +1,13 @@
 /**
- * 主控制器邏輯 (app.js) - 全面升級版 (金融級視覺、快取防護與印章盒導引)
- * 整合：司法院訴狀、股金抵銷、身故繼承、扣薪計算機、時效 KPI 看板、Word 匯出與草稿自動暫存
+ * 主控制器邏輯 (app.js) - 全面升級版 (專職減負 Wizard、情境導航、白話小抄與 A4 擬真)
+ * 整合：4 大情境入口、三步驟摺疊導引、司法院訴狀、股金抵銷、身故繼承、扣薪計算機、時效 KPI 看板、Word 匯出與草稿自動暫存
  */
 
 // 儲存原始純文字供複製與下載
 let currentRawDocText = '';
 
 document.addEventListener('DOMContentLoaded', () => {
+  initScenarioNav();
   initTabs();
   initCourtSelect();
   initProfileSettings();
@@ -82,6 +83,25 @@ function fallbackCopyText(text, successMsg) {
 }
 
 /* ==========================================================================
+   0. 頂部 4 大情境導航大卡片 (Scenario Navigation)
+   ========================================================================== */
+function initScenarioNav() {
+  const scenarioCards = document.querySelectorAll('.scenario-card');
+  scenarioCards.forEach(card => {
+    card.addEventListener('click', () => {
+      const targetTab = card.getAttribute('data-scenario');
+      if (targetTab) {
+        switchTab(targetTab);
+        // 若為公文生成，預設展開第一步
+        if (targetTab === 'tab-docs') {
+          openNextStep('stepCard1');
+        }
+      }
+    });
+  });
+}
+
+/* ==========================================================================
    1. 分頁切換 (Tabs)
    ========================================================================== */
 function initTabs() {
@@ -121,7 +141,29 @@ function switchTab(tabId) {
 }
 
 /* ==========================================================================
-   2. 法院下拉選單初始化
+   2. 三步驟摺疊導引 (Accordion Step Wizard for Tab 1)
+   ========================================================================== */
+function toggleAccordion(cardId) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  card.classList.toggle('active');
+}
+
+function openNextStep(nextCardId) {
+  const allSteps = ['stepCard1', 'stepCard2', 'stepCard3'];
+  allSteps.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('active');
+  });
+  const nextCard = document.getElementById(nextCardId);
+  if (nextCard) {
+    nextCard.classList.add('active');
+    nextCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+/* ==========================================================================
+   3. 法院下拉選單初始化
    ========================================================================== */
 function initCourtSelect() {
   const courtSelect = document.getElementById('docCourt');
@@ -137,7 +179,7 @@ function initCourtSelect() {
 }
 
 /* ==========================================================================
-   3. 本社資料設定 (記住本社)
+   4. 本社資料設定 (記住本社)
    ========================================================================== */
 function initProfileSettings() {
   const profile = loadCuProfile();
@@ -191,7 +233,7 @@ function updateScriptFormFromProfile() {
 }
 
 /* ==========================================================================
-   4. 早期關懷話術生成器
+   5. 早期關懷話術生成器
    ========================================================================== */
 function initScriptsGenerator() {
   const inputs = ['scriptDebtorName', 'scriptGender', 'scriptOverdueMonths', 'scriptOverdueAmount', 'scriptCuName', 'scriptCuPhone'];
@@ -255,7 +297,7 @@ function updateScriptsPreview() {
 }
 
 /* ==========================================================================
-   5. 司法院標準法催與抵銷公文生成器 (含實體印鑑盒導引)
+   6. 司法院標準法催與抵銷公文生成器 (含實體印鑑盒導引)
    ========================================================================== */
 function initDocGenerator() {
   const formInputs = [
@@ -437,11 +479,15 @@ function updateDocTypeVisibility() {
   const deceasedWrap = document.getElementById('deceasedSpecificFields');
   const courtGroup = document.getElementById('courtSelectGroup');
   const guarantorGroup = document.getElementById('guarantorCheckboxGroup');
+  const generalHint = document.getElementById('generalDocHint');
+
+  const hasSpecial = (type === 'execution' || type === 'renew_cert' || type === 'offset_share' || type === 'offset_board' || type === 'household_apply' || type === 'inheritance_inquiry' || type === 'inheritance_demand');
 
   if (execWrap) execWrap.style.display = (type === 'execution') ? 'block' : 'none';
   if (renewWrap) renewWrap.style.display = (type === 'renew_cert') ? 'block' : 'none';
   if (offsetWrap) offsetWrap.style.display = (type === 'offset_share' || type === 'offset_board') ? 'block' : 'none';
   if (deceasedWrap) deceasedWrap.style.display = (type === 'household_apply' || type === 'inheritance_inquiry' || type === 'inheritance_demand') ? 'block' : 'none';
+  if (generalHint) generalHint.style.display = hasSpecial ? 'none' : 'block';
 
   if (courtGroup) {
     courtGroup.style.display = (type === 'offset_share' || type === 'offset_board' || type === 'household_apply') ? 'none' : 'flex';
@@ -550,7 +596,6 @@ function updateDocPreview() {
 
   const previewEl = document.getElementById('docPreviewText');
   if (previewEl) {
-    // 轉譯 HTML 安全字元，並將印章標籤轉為實體紅虛線印鑑盒
     let escaped = text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -575,7 +620,7 @@ function updateDocPreview() {
 }
 
 /* ==========================================================================
-   6. 強制執行薪資扣押計算機模組 (含 100% 薪資結構堆疊圖)
+   7. 強制執行薪資扣押計算機模組 (含 100% 薪資結構堆疊圖)
    ========================================================================== */
 function initSalaryCalculator() {
   const inputs = ['salaryMonthlyIncome', 'salaryRegion', 'salaryDependents', 'salarySupportRatio'];
@@ -622,7 +667,6 @@ function renderSalaryCalculationResult(res) {
     alertHtml = `<div class="alert-box info" style="margin-bottom:14px;">${res.warningMessage}</div>`;
   }
 
-  // 計算薪資結構堆疊條百分比 (100%)
   const total = res.salary || 1;
   const personalPct = Math.min(100, Math.round((res.personalCost / total) * 100));
   const dependentsPct = Math.min(100 - personalPct, Math.round((res.dependentsCost / total) * 100));
@@ -722,7 +766,7 @@ function renderSalaryCalculationResult(res) {
 }
 
 /* ==========================================================================
-   7. 5 年消滅時效鬧鐘與台帳管理 (可點擊 KPI 與動態進度條)
+   8. 5 年消滅時效鬧鐘與台帳管理 (可點擊 KPI 與動態進度條)
    ========================================================================== */
 function initLedger() {
   renderLedgerKpis();
@@ -743,7 +787,6 @@ function initLedger() {
     });
   }
 
-  // 為頂部 KPI 卡片綁定點擊即時篩選
   const kpiCards = document.querySelectorAll('.kpi-card');
   kpiCards.forEach(card => {
     card.addEventListener('click', () => {
@@ -903,7 +946,6 @@ function renderLedgerTable(query = '', filterStatus = 'all') {
       progressClass = 'expired';
     }
 
-    // 計算 5 年生命週期消耗比例 (5年 = 1825天)
     const totalDays = 1825;
     const daysLeft = Math.max(0, r.remainingDays || 0);
     const consumedPct = Math.min(100, Math.max(0, Math.round(((totalDays - daysLeft) / totalDays) * 100)));
@@ -924,7 +966,6 @@ function renderLedgerTable(query = '', filterStatus = 'all') {
             ${r.remainingDays > 0 ? `剩 ${r.remainingDays} 天` : `逾期 ${Math.abs(r.remainingDays)} 天`}
           </span>
         </div>
-        <!-- 5 年生命週期動態進度條 -->
         <div class="statute-progress-wrap" title="5年時效已流逝 ${consumedPct}%">
           <div class="statute-progress-bar ${progressClass}" style="width: ${consumedPct}%;"></div>
         </div>
@@ -976,6 +1017,7 @@ function triggerRenewDoc(id) {
   updateDocTypeVisibility();
   updateDocPreview();
   switchTab('tab-docs');
+  openNextStep('stepCard3');
   showToast(`⚖️ 已將 ${r.debtorName} 憑證資料帶入換發債權憑證狀！`);
 }
 
@@ -1016,7 +1058,7 @@ function handleDeleteRecord(id) {
 }
 
 /* ==========================================================================
-   8. 草稿自動還原 (Draft Auto-restore)
+   9. 草稿自動還原 (Draft Auto-restore)
    ========================================================================== */
 function restoreDrafts() {
   const docDraft = loadDraft(STORAGE_KEYS.DRAFT_DOC);
@@ -1034,7 +1076,7 @@ function restoreDrafts() {
 }
 
 /* ==========================================================================
-   9. Demo 範例資料一鍵填入
+   10. Demo 範例資料一鍵填入
    ========================================================================== */
 function initDemoDataButton() {
   const demoBtn = document.getElementById('btnLoadDemoData');
@@ -1070,7 +1112,6 @@ function initDemoDataButton() {
       document.getElementById('docGuarantorAddress').value = '臺中市南屯區大墩路 80 號';
     }
 
-    // 填入台帳範例
     const existing = loadRecords();
     if (existing.length === 0) {
       saveRecord({

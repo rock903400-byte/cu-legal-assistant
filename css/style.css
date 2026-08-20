@@ -102,10 +102,70 @@ body {
 /* 主要版面容器 */
 .main-layout {
   max-width: 1240px;
-  margin: 24px auto;
+  margin: 20px auto;
   padding: 0 16px;
   flex: 1;
   width: 100%;
+}
+
+/* ==========================================================================
+   0. 頂部 4 大情境導航大卡片 (Scenario Quick Entrance)
+   ========================================================================== */
+.scenario-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.scenario-card {
+  background: #FFFFFF;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(15, 41, 66, 0.04);
+  text-decoration: none;
+  user-select: none;
+}
+
+.scenario-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(15, 41, 66, 0.1);
+  border-color: var(--navy-accent);
+}
+
+.scenario-icon-wrap {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.scenario-1 .scenario-icon-wrap { background: #ECFDF5; color: #059669; }
+.scenario-2 .scenario-icon-wrap { background: #EFF6FF; color: #2563EB; }
+.scenario-3 .scenario-icon-wrap { background: #FFFBEB; color: #D97706; }
+.scenario-4 .scenario-icon-wrap { background: #FEF2F2; color: #DC2626; }
+
+.scenario-title {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: var(--navy-primary);
+  margin-bottom: 2px;
+}
+
+.scenario-desc {
+  font-size: 0.8rem;
+  color: var(--sub-text);
+  line-height: 1.35;
 }
 
 /* 分頁選單 (Tabs) */
@@ -115,7 +175,7 @@ body {
   background: #E2E8F0;
   padding: 6px;
   border-radius: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 22px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
@@ -171,15 +231,15 @@ body {
   background: var(--bg-card);
   border: 1.5px solid var(--border);
   border-radius: 14px;
-  padding: 24px;
-  margin-bottom: 24px;
+  padding: 22px;
+  margin-bottom: 22px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
 .card-header {
   border-bottom: 2px solid var(--navy-light);
   padding-bottom: 14px;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -197,7 +257,101 @@ body {
 }
 
 /* ==========================================================================
-   1. KPI 看板卡片 (可點擊互動篩選)
+   1. 三步驟摺疊導引表單 (Accordion Steps for Tab 1)
+   ========================================================================== */
+.accordion-step-card {
+  background: #FFFFFF;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 14px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.accordion-step-card.active {
+  border-color: var(--navy-accent);
+  box-shadow: 0 4px 14px rgba(29, 78, 216, 0.08);
+}
+
+.accordion-header {
+  padding: 14px 18px;
+  background: #F8FAFC;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid transparent;
+  transition: background 0.15s ease;
+}
+
+.accordion-step-card.active .accordion-header {
+  background: var(--navy-light);
+  border-bottom-color: #BFDBFE;
+}
+
+.accordion-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.step-num-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--navy-primary);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.accordion-step-card.active .step-num-badge {
+  background: var(--navy-accent);
+}
+
+.accordion-title {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--navy-primary);
+}
+
+.accordion-toggle-icon {
+  font-size: 0.9rem;
+  color: var(--sub-text);
+  transition: transform 0.2s ease;
+}
+
+.accordion-step-card.active .accordion-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.accordion-body {
+  padding: 18px;
+  display: none;
+}
+
+.accordion-step-card.active .accordion-body {
+  display: block;
+}
+
+/* 白話實務小抄 */
+.field-tip-box {
+  background: #FEF9C3;
+  border-left: 4px solid #CA8A04;
+  padding: 6px 10px;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.8rem;
+  color: #854D0E;
+  margin-top: 4px;
+  line-height: 1.45;
+}
+
+/* ==========================================================================
+   2. KPI 看板卡片 (可點擊互動篩選)
    ========================================================================== */
 .kpi-grid {
   display: grid;
@@ -269,7 +423,7 @@ body {
 .badge-dark { background: #E2E8F0; color: #334155; }
 
 /* ==========================================================================
-   2. 5 年生命週期動態進度條 (Progress Bar & Pulse)
+   3. 5 年生命週期動態進度條 (Progress Bar & Pulse)
    ========================================================================== */
 .statute-progress-wrap {
   width: 100%;
@@ -309,7 +463,7 @@ body {
 }
 
 /* ==========================================================================
-   3. 扣薪 100% 薪資結構堆疊分配條 (Stacked Bar Chart)
+   4. 扣薪 100% 薪資結構堆疊分配條 (Stacked Bar Chart)
    ========================================================================== */
 .salary-stacked-bar-container {
   margin: 18px 0;
@@ -344,10 +498,10 @@ body {
   padding: 0 4px;
 }
 
-.seg-personal { background: #2563EB; } /* 藍色：本人最低生活保障 1.2倍 */
-.seg-dependents { background: #D97706; } /* 琥珀色：扶養親屬保障 */
-.seg-garnishable { background: #DC2626; } /* 紅色：法院合法扣押上限 */
-.seg-exempt { background: #64748B; } /* 灰色：不足額免扣押 */
+.seg-personal { background: #2563EB; }
+.seg-dependents { background: #D97706; }
+.seg-garnishable { background: #DC2626; }
+.seg-exempt { background: #64748B; }
 
 .stacked-legend {
   display: flex;
@@ -370,7 +524,7 @@ body {
 }
 
 /* ==========================================================================
-   4. A4 擬真紙張與用印引導框 (A4 Realistic Sheet & Stamp Guides)
+   5. A4 擬真紙張與用印引導框 (A4 Realistic Sheet & Stamp Guides)
    ========================================================================== */
 .a4-paper-wrapper {
   background: #E2E8F0;
@@ -417,7 +571,7 @@ body {
 }
 
 /* ==========================================================================
-   5. 通用彈窗與捲動保護 (Modal Overlay & Dialog)
+   6. 通用彈窗與捲動保護 (Modal Overlay & Dialog)
    ========================================================================== */
 .modal-overlay {
   display: none;
@@ -452,8 +606,8 @@ body {
 /* 表單元件 */
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
 }
 
 .form-group {
