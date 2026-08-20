@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="儲蓄互助社智慧法催公文助手與 5 年時效到期鬧鐘：純前端本地運算、零個資外洩、司法院標準訴狀一鍵排版、人身保險與存款扣押、5年時效管理台帳與行事曆鬧鐘推播。">
+  <title>儲蓄互助社 智慧法催公文助手與 5 年時效到期鬧鐘</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/print.css" media="print">
+</head>
+<body>
+
+  <!-- 頂部導航列 -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand">
+        <div class="brand-icon">⚖️</div>
+        <div class="brand-text">
+          <h1>儲蓄互助社 智慧法催公文助手</h1>
+          <p>司法院標準書狀排版 ｜ 5 年時效到期鬧鐘 ｜ 純前端本地運算・零個資外洩</p>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button type="button" class="btn btn-warning btn-sm" id="btnLoadDemoData" title="一鍵載入測試範例">
+          ✨ 填入測試範例
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('profileModal').style.display='flex'" style="background:rgba(255,255,255,0.15); color:#fff; border-color:rgba(255,255,255,0.3);">
+          ⚙️ 記住本社資料
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主要內容區 -->
+  <main class="main-layout">
+
+    <!-- 分頁選單 (Tab Navigation) -->
+    <nav class="tab-nav" aria-label="功能分頁選單">
+      <button type="button" class="tab-btn active" data-tab="tab-docs">
+        <span>⚖️</span> 司法院標準法催公文
+      </button>
+      <button type="button" class="tab-btn" data-tab="tab-statute">
+        <span>⏰</span> 5 年時效鬧鐘與台帳
+      </button>
+      <button type="button" class="tab-btn" data-tab="tab-scripts">
+        <span>📱</span> 早期溫情關懷話術
+      </button>
+      <button type="button" class="tab-btn" data-tab="tab-faq">
+        <span>📖</span> 法催法規與實務問答
+      </button>
+    </nav>
+
+    <!-- =========================================================================
+         分頁 1：司法院標準法催公文 (Tab 1: Legal Docs)
+         ========================================================================= -->
+    <section class="tab-content active" id="tab-docs">
+      <div class="doc-split-view">
+        
+        <!-- 左側：輸入表單 -->
+        <div class="doc-form-pane">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">📝 法催案件資訊填寫</h2>
+              <span class="badge badge-primary">純本機運算・無個資外洩</span>
+            </div>
+
+            <div class="form-grid">
+              <!-- 公文類型選擇 -->
+              <div class="form-group col-span-full">
+                <label for="docType">📄 選擇欲產出的司法院標準公文：</label>
+                <select id="docType" class="form-control" style="font-weight:800; color:var(--navy-accent); font-size:1.02rem;">
+                  <option value="payment_order">1. 《民事支付命令聲請狀》（民事訴訟法第 508 條）</option>
+                  <option value="execution">2. 《民事強制執行聲請狀》（含扣押保險/存款/薪資）</option>
+                  <option value="renew_cert">3. 《民事聲請換發債權憑證狀》（強制執行法第 27 條）</option>
+                </select>
+              </div>
+
+              <!-- 債務人基本資料 -->
+              <div class="form-group">
+                <label for="docDebtorName">債務人姓名 <span style="color:#DC2626;">*</span></label>
+                <input type="text" id="docDebtorName" class="form-control" placeholder="例：王小明" value="張大同">
+              </div>
+              <div class="form-group">
+                <label for="docDebtorId">身分證字號</label>
+                <input type="text" id="docDebtorId" class="form-control" placeholder="例：B123456789" value="B123456789">
+              </div>
+              <div class="form-group col-span-full">
+                <label for="docDebtorAddress">戶籍住居所地址（自動比對管轄法院）</label>
+                <input type="text" id="docDebtorAddress" class="form-control" placeholder="例：臺中市西區五權路 50 號" value="臺中市西區五權路 50 號">
+              </div>
+
+              <!-- 連帶保證人 (可開合) -->
+              <div class="form-group col-span-full">
+                <label style="cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
+                  <input type="checkbox" id="docHasGuarantor" style="width:18px; height:18px; accent-color:var(--navy-accent);">
+                  <span>含連帶保證人共同求償</span>
+                </label>
+              </div>
+
+              <div id="guarantorFieldsWrap" class="col-span-full" style="display:none; background:var(--navy-light); padding:14px; border-radius:8px; margin-bottom:10px;">
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="docGuarantorName">連帶保證人姓名</label>
+                    <input type="text" id="docGuarantorName" class="form-control" placeholder="例：李小華">
+                  </div>
+                  <div class="form-group">
+                    <label for="docGuarantorId">保證人身分證字號</label>
+                    <input type="text" id="docGuarantorId" class="form-control" placeholder="例：L223456789">
+                  </div>
+                  <div class="form-group col-span-full">
+                    <label for="docGuarantorAddress">保證人住居所地址</label>
+                    <input type="text" id="docGuarantorAddress" class="form-control" placeholder="例：臺中市西區民權路 120 號">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 借款與欠款金額 (支援直接手動輸入) -->
+              <div class="form-group">
+                <label for="docLoanDate">借款借據日期</label>
+                <input type="date" id="docLoanDate" class="form-control" value="2023-01-15">
+              </div>
+              <div class="form-group">
+                <label for="docLoanAmount">原始借款金額 (元)</label>
+                <input type="number" id="docLoanAmount" class="form-control" value="300000">
+              </div>
+              <div class="form-group">
+                <label for="docPrincipal">未償本金餘額 (元) <span style="color:#DC2626;">*</span></label>
+                <input type="number" id="docPrincipal" class="form-control" value="210000">
+              </div>
+              <div class="form-group">
+                <label for="docInterestRate">約定年利率 (%)</label>
+                <input type="number" step="0.1" id="docInterestRate" class="form-control" value="6.5">
+              </div>
+              <div class="form-group">
+                <label for="docLastPaymentDate">最後繳息日 / 起算日</label>
+                <input type="date" id="docLastPaymentDate" class="form-control" value="2023-11-20">
+              </div>
+
+              <!-- 手動利息與違約金輸入 -->
+              <div class="form-group">
+                <label for="docManualInterest">
+                  積欠利息金額 (元)
+                  <button type="button" class="btn btn-outline btn-sm" id="btnEstimateInterest" style="padding:2px 6px; font-size:0.75rem;">💡 依日試算</button>
+                </label>
+                <input type="number" id="docManualInterest" class="form-control" placeholder="可直接手動輸入金額" value="0">
+              </div>
+              <div class="form-group">
+                <label for="docManualPenalty">積欠違約金金額 (元)</label>
+                <input type="number" id="docManualPenalty" class="form-control" placeholder="可直接手動輸入金額" value="0">
+              </div>
+
+              <!-- 管轄法院 -->
+              <div class="form-group">
+                <label for="docCourt">管轄地方法院</label>
+                <select id="docCourt" class="form-control"></select>
+              </div>
+
+              <!-- 強制執行專屬欄位 (標的勾選清單) -->
+              <div id="executionSpecificFields" class="col-span-full" style="display:none; border-top:2px dashed var(--border); padding-top:16px; margin-top:6px;">
+                <h3 style="font-size:1rem; font-weight:800; color:var(--navy-primary); margin-bottom:10px;">
+                  🎯 聲請強制執行之標的及方法（可複選）：
+                </h3>
+                <div class="checkbox-card-grid">
+                  <label class="checkbox-card">
+                    <input type="checkbox" id="targetBankDeposit" checked>
+                    <div class="checkbox-label">
+                      <h4>🏦 查調與扣押金融存款</h4>
+                      <p>聲請法院囑託【銀行公會】查調並扣押債務人於金融機構存款</p>
+                    </div>
+                  </label>
+
+                  <label class="checkbox-card">
+                    <input type="checkbox" id="targetInsurance" checked>
+                    <div class="checkbox-label">
+                      <h4>🛡️ 扣押人身保險解約金</h4>
+                      <p>依最高法院 108 台抗大 897 號，查調壽險公會並扣押保單價值準備金</p>
+                    </div>
+                  </label>
+
+                  <label class="checkbox-card">
+                    <input type="checkbox" id="targetSalary" checked>
+                    <div class="checkbox-label">
+                      <h4>💼 扣押每月 1/3 薪資</h4>
+                      <p>強制執行法第 115-1 條，扣押任職單位之薪資及各項獎金</p>
+                    </div>
+                  </label>
+
+                  <label class="checkbox-card">
+                    <input type="checkbox" id="targetTaxData" checked>
+                    <div class="checkbox-label">
+                      <h4>📑 查調國稅局所得財產</h4>
+                      <p>囑託財政部國稅局查調全年度財產總歸戶及所得清單</p>
+                    </div>
+                  </label>
+
+                  <label class="checkbox-card">
+                    <input type="checkbox" id="targetRealEstate">
+                    <div class="checkbox-label">
+                      <h4>🏠 查封拍賣不動產</h4>
+                      <p>查封並拍賣債務人所有之土地或建物標的</p>
+                    </div>
+                  </label>
+                </div>
+
+                <div class="form-grid" style="margin-top:12px;">
+                  <div class="form-group">
+                    <label for="docTitleCaseNo">原執行名義案號 (支付命令/判決字號)</label>
+                    <input type="text" id="docTitleCaseNo" class="form-control" placeholder="例：112 年度司促字第 12345 號" value="112 年度司促字第 12345 號">
+                  </div>
+                  <div class="form-group">
+                    <label for="targetEmployerName">債務人任職單位 (扣薪時填寫，選填)</label>
+                    <input type="text" id="targetEmployerName" class="form-control" placeholder="若不知可留空，待查國稅局清單後補陳">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 換發債權憑證專屬欄位 -->
+              <div id="renewCertSpecificFields" class="col-span-full" style="display:none; border-top:2px dashed var(--border); padding-top:16px; margin-top:6px;">
+                <h3 style="font-size:1rem; font-weight:800; color:var(--navy-primary); margin-bottom:10px;">
+                  🔄 換發債權憑證案號資訊：
+                </h3>
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="docCaseYear">年度 (民國)</label>
+                    <input type="number" id="docCaseYear" class="form-control" value="112">
+                  </div>
+                  <div class="form-group">
+                    <label for="docCaseWord">字別</label>
+                    <input type="text" id="docCaseWord" class="form-control" value="司執">
+                  </div>
+                  <div class="form-group">
+                    <label for="docCaseNo">案號</label>
+                    <input type="text" id="docCaseNo" class="form-control" value="98765">
+                  </div>
+                  <div class="form-group">
+                    <label for="docCaseSection">股別</label>
+                    <input type="text" id="docCaseSection" class="form-control" value="民">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 金額中文大寫即時提示 -->
+              <div class="form-group col-span-full" style="background:#FEF3C7; padding:10px 14px; border-radius:6px; border:1px solid #FDE68A;">
+                <div id="chineseAmountHint" style="font-weight:800; color:#78350F; font-size:0.92rem;">
+                  合計：新臺幣貳拾壹萬元整
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- 右側：即時排版預覽與公文操作 -->
+        <div class="doc-preview-container">
+          <div class="card" style="height:100%; display:flex; flex-direction:column;">
+            <div class="card-header">
+              <h2 class="card-title">📄 司法院標準公文即時預覽</h2>
+              <span class="badge badge-success">A4 標準訴狀排版</span>
+            </div>
+
+            <!-- 公文內容預覽區塊 -->
+            <pre class="doc-preview-pane" id="docPreviewText"></pre>
+
+            <!-- 操作按鈕列 -->
+            <div class="doc-actions-bar">
+              <button type="button" class="btn btn-primary" id="btnCopyDoc">
+                📋 一鍵複製全文
+              </button>
+              <button type="button" class="btn btn-accent" id="btnPrintDoc">
+                🖨️ A4 直接列印 / 存為 PDF
+              </button>
+              <button type="button" class="btn btn-outline" id="btnDownloadTxt">
+                💾 下載純文字
+              </button>
+              <button type="button" class="btn btn-warning" id="btnSaveDocToLedger" title="將此案加入 5 年時效監控台帳">
+                ⏰ 存入 5 年時效台帳
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         分頁 2：5 年消滅時效鬧鐘與台帳管理 (Tab 2: Statute & Ledger)
+         ========================================================================= -->
+    <section class="tab-content" id="tab-statute">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">⏰ 債權憑證 5 年消滅時效管理台帳</h2>
+            <p style="font-size:0.85rem; color:var(--muted); margin-top:4px;">
+              依民法第 126 條及第 137 條第 3 項：憑證核發滿 5 年時效消滅。系統自動倒數並於屆滿前 6 個月主動提醒換證。
+            </p>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary btn-sm" id="btnAddRecord">
+              ➕ 新增憑證案件
+            </button>
+            <button type="button" class="btn btn-accent btn-sm" id="btnExportAllICS" title="下載全社案件之行事曆推播提醒">
+              📅 匯出全部 .ics 鬧鐘
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" id="btnExportCSV">
+              📊 匯出 Excel (CSV)
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" id="btnExportJSON">
+              💾 備份 JSON
+            </button>
+            <label class="btn btn-outline btn-sm" style="margin:0; cursor:pointer;">
+              📂 匯入備份
+              <input type="file" id="importJSONFile" accept=".json" style="display:none;">
+            </label>
+          </div>
+        </div>
+
+        <!-- 搜尋與篩選列 -->
+        <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:240px;">
+            <input type="text" id="ledgerSearch" class="form-control" placeholder="🔍 搜尋債務人姓名、身分證字號或案號...">
+          </div>
+          <div style="width:200px;">
+            <select id="ledgerFilter" class="form-control">
+              <option value="all">全部時效狀態</option>
+              <option value="safe">🟢 安全期 (>180天)</option>
+              <option value="warning">🟡 預警期 (90~180天)</option>
+              <option value="urgent">🔴 緊急告急 (<90天)</option>
+              <option value="expired">⚫ 已逾期</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 台帳清單表格 -->
+        <div class="table-responsive">
+          <table class="ledger-table">
+            <thead>
+              <tr>
+                <th>債務人</th>
+                <th>憑證案號</th>
+                <th>管轄法院</th>
+                <th>債權本金</th>
+                <th>核發日期</th>
+                <th>5年到期日 (剩餘天數)</th>
+                <th>時效狀態</th>
+                <th style="width:210px;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="ledgerTableBody">
+              <!-- 動態由 JavaScript 渲染 -->
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         分頁 3：早期溫情關懷話術 (Tab 3: Early Care Scripts)
+         ========================================================================= -->
+    <section class="tab-content" id="tab-scripts">
+      <div class="doc-split-view">
+        
+        <!-- 左側：話術參數輸入 -->
+        <div class="doc-form-pane">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">📱 早期關懷與催繳情境設定</h2>
+              <span class="badge badge-warning">逾期 1~2 個月黃金介入期</span>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="scriptDebtorName">借款人姓名</label>
+                <input type="text" id="scriptDebtorName" class="form-control" value="王小明">
+              </div>
+              <div class="form-group">
+                <label for="scriptGender">稱謂性別</label>
+                <select id="scriptGender" class="form-control">
+                  <option value="male">先生</option>
+                  <option value="female">女士</option>
+                  <option value="none">不加稱謂</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="scriptOverdueMonths">逾期期數 / 月數</label>
+                <input type="number" id="scriptOverdueMonths" class="form-control" value="1" min="1" max="12">
+              </div>
+              <div class="form-group">
+                <label for="scriptOverdueAmount">目前累計欠繳金額 (元)</label>
+                <input type="number" id="scriptOverdueAmount" class="form-control" value="15000">
+              </div>
+              <div class="form-group">
+                <label for="scriptCuName">本社簡稱</label>
+                <input type="text" id="scriptCuName" class="form-control" value="臺中第一儲蓄互助社">
+              </div>
+              <div class="form-group">
+                <label for="scriptCuPhone">本社聯絡電話</label>
+                <input type="text" id="scriptCuPhone" class="form-control" value="04-22223333">
+              </div>
+            </div>
+
+            <div style="margin-top:20px; padding:14px; background:var(--navy-light); border-radius:8px; font-size:0.85rem; color:var(--navy-primary);">
+              💡 <b>《呆帳處理辦法》第 11 條提醒：</b>逾期 1~2 個月為最佳協調期，以溫情同理心切入，了解社員是否遭遇暫時失業或家庭變故，主動提供「展延寬限」或「紓困分期」，化解人情尷尬並有效降低呆帳率。
+            </div>
+          </div>
+        </div>
+
+        <!-- 右側：生成話術與 LINE 文案 -->
+        <div class="doc-preview-container">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">📞 客製電訪腳本與 LINE 催繳文案</h2>
+            </div>
+
+            <!-- 電訪 1: 同理心 -->
+            <div class="script-card">
+              <h3>
+                <span>🌸 1. 溫情同理心關懷型（適合初次逾期）</span>
+                <button type="button" class="btn btn-outline btn-sm btn-copy-script" data-target="scriptEmpathyText">📋 複製</button>
+              </h3>
+              <div class="script-content" id="scriptEmpathyText"></div>
+            </div>
+
+            <!-- 電訪 2: 協商建議 -->
+            <div class="script-card warning">
+              <h3>
+                <span>🤝 2. 紓困分期／展延協商型（適合重大變故者）</span>
+                <button type="button" class="btn btn-outline btn-sm btn-copy-script" data-target="scriptNegotiationText">📋 複製</button>
+              </h3>
+              <div class="script-content" id="scriptNegotiationText"></div>
+            </div>
+
+            <!-- 電訪 3: 正式提醒 -->
+            <div class="script-card danger">
+              <h3>
+                <span>⚠️ 3. 幹部正式提醒型（即將逾期 2 個月）</span>
+                <button type="button" class="btn btn-outline btn-sm btn-copy-script" data-target="scriptFormalText">📋 複製</button>
+              </h3>
+              <div class="script-content" id="scriptFormalText"></div>
+            </div>
+
+            <!-- LINE 文案 -->
+            <div style="margin-top:24px;">
+              <h3 style="font-size:1.15rem; font-weight:800; color:var(--navy-primary); margin-bottom:14px;">
+                💬 LINE 官方帳號 / 簡訊一鍵複製文案
+              </h3>
+              <div class="script-card">
+                <h3>
+                  <span>💬 LINE 親切提醒版</span>
+                  <button type="button" class="btn btn-outline btn-sm btn-copy-script" data-target="scriptLineGentleText">📋 複製</button>
+                </h3>
+                <div class="script-content" id="scriptLineGentleText"></div>
+              </div>
+              <div class="script-card warning">
+                <h3>
+                  <span>⚠️ LINE 正式催繳版</span>
+                  <button type="button" class="btn btn-outline btn-sm btn-copy-script" data-target="scriptLineFormalText">📋 複製</button>
+                </h3>
+                <div class="script-content" id="scriptLineFormalText"></div>
+              </div>
+              <div class="script-card danger">
+                <h3>
+                  <span>🚨 LINE 法催前最後通告</span>
+                  <button type="button" class="btn btn-outline btn-sm btn-copy-script" data-target="scriptLineWarningText">📋 複製</button>
+                </h3>
+                <div class="script-content" id="scriptLineWarningText"></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         分頁 4：法催法規與實務問答 (Tab 4: Legal Reference & FAQ)
+         ========================================================================= -->
+    <section class="tab-content" id="tab-faq">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">📖 儲蓄互助社法催實務指引與法規庫</h2>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:18px;">
+          
+          <div class="script-card">
+            <h3 style="color:var(--navy-accent);">⚖️ 1. 強制執行如何扣押人壽保險解約金？（最高法院 108 年度台抗大字第 897 號民事大法庭裁定）</h3>
+            <p style="font-size:0.95rem; line-height:1.8; color:var(--sub-text);">
+              <b>法律重點：</b>過去保險公司常主張保單終止權屬要保人一身專屬權，執行法院無權終止。最高法院大法庭於 108 年度台抗大字第 897 號裁定正式確立：<b>執行法院於必要時，得核發執行命令終止債務人為要保人之人壽保險契約，命第三人保險公司償付解約金支付債權人</b>。<br>
+              <b>實務操作：</b>在《強制執行聲請狀》中，勾選聲請法院囑託「中華民國人壽保險商業同業公會」查調債務人投保之保單，並載明依此大法庭裁定意旨扣押解約金（保單價值準備金）。
+            </p>
+          </div>
+
+          <div class="script-card">
+            <h3 style="color:var(--navy-accent);">🏦 2. 如何查調債務人於全台金融機構之存款？</h3>
+            <p style="font-size:0.95rem; line-height:1.8; color:var(--sub-text);">
+              <b>法律重點：</b>債權人取得執行名義後，若不知債務人開戶銀行，得於《強制執行聲請狀》中聲請執行法院囑託<b>「中華民國銀行商業同業公會全國聯合會」</b>向全台金融機構（含本國銀行、外國銀行在台分行、中華郵政、信用合作社、農漁會信用部）統一查詢債務人之存款帳戶並核發扣押命令。
+            </p>
+          </div>
+
+          <div class="script-card">
+            <h3 style="color:var(--navy-accent);">⏰ 3. 債權憑證為什麼是 5 年消滅時效？逾期會如何？</h3>
+            <p style="font-size:0.95rem; line-height:1.8; color:var(--sub-text);">
+              <b>法律重點：</b>依《民法》第 126 條，利息之請求權時效為 5 年；另依《民法》第 137 條第 3 項，本金借款債權經換發債權憑證後，因中斷而重行起算之消滅時效期間亦為 5 年。<br>
+              <b>實務風險：</b>若超過 5 年未向法院具狀聲請換發債權憑證，債務人得於後續強制執行時主張「時效消滅抗辯權」而拒絕清償，導致<b>債權憑證淪為廢紙</b>。因此專職人員應利用本系統之 5 年時效鬧鐘，在屆滿前 6 個月即時聲請換發。
+            </p>
+          </div>
+
+          <div class="script-card">
+            <h3 style="color:var(--navy-accent);">💼 4. 強制執行薪資扣押之法定上限為何？</h3>
+            <p style="font-size:0.95rem; line-height:1.8; color:var(--sub-text);">
+              <b>法律重點：</b>依《強制執行法》第 115 條之 1 規定，對於薪資之強制執行，以扣押債務人每月得受領薪資之 1/3 為原則；惟扣押後債務人剩餘之金額，不得低於衛生福利部所公告當地當年度每人每月最低生活費之 1.2 倍（維持債務人及其共同生活之親屬生活所必需）。
+            </p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 本社資料設定彈窗 (Profile Modal) -->
+  <div id="profileModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:999; align-items:center; justify-content:center; padding:16px;">
+    <div class="card" style="max-width:550px; width:100%; margin:0; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+      <div class="card-header">
+        <h2 class="card-title">⚙️ 記住本社基本資料</h2>
+        <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('profileModal').style.display='none'">✕</button>
+      </div>
+      <div class="form-grid">
+        <div class="form-group col-span-full">
+          <label for="profileCuName">儲蓄互助社完整法定名稱</label>
+          <input type="text" id="profileCuName" class="form-control" value="有限責任臺中市第一儲蓄互助社">
+        </div>
+        <div class="form-group">
+          <label for="profileCuTaxId">統一編號</label>
+          <input type="text" id="profileCuTaxId" class="form-control" value="04123456">
+        </div>
+        <div class="form-group">
+          <label for="profileCuRep">法定代理人 (理事長)</label>
+          <input type="text" id="profileCuRep" class="form-control" value="陳理事長">
+        </div>
+        <div class="form-group col-span-full">
+          <label for="profileCuAddress">本社設址地址</label>
+          <input type="text" id="profileCuAddress" class="form-control" value="臺中市西區民生路 100 號">
+        </div>
+        <div class="form-group">
+          <label for="profileCuPhone">聯絡電話</label>
+          <input type="text" id="profileCuPhone" class="form-control" value="04-22223333">
+        </div>
+        <div class="form-group">
+          <label for="profileAgentName">專職送達代收人</label>
+          <input type="text" id="profileAgentName" class="form-control" value="李專職">
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('profileModal').style.display='none'">取消</button>
+        <button type="button" class="btn btn-primary" id="saveProfileBtn" onclick="document.getElementById('profileModal').style.display='none'">儲存設定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增/編輯憑證彈窗 (Record Modal) -->
+  <div id="recordModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:999; align-items:center; justify-content:center; padding:16px;">
+    <div class="card" style="max-width:600px; width:100%; margin:0; max-height:90vh; overflow-y:auto;">
+      <div class="card-header">
+        <h2 class="card-title">📝 編輯債權憑證案件</h2>
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeRecordModal()">✕</button>
+      </div>
+      <form id="recordForm">
+        <input type="hidden" id="modalRecordId">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="modalDebtorName">債務人姓名 <span style="color:#DC2626;">*</span></label>
+            <input type="text" id="modalDebtorName" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="modalDebtorId">身分證字號</label>
+            <input type="text" id="modalDebtorId" class="form-control">
+          </div>
+          <div class="form-group">
+            <label for="modalCertNo">憑證/執行案號 <span style="color:#DC2626;">*</span></label>
+            <input type="text" id="modalCertNo" class="form-control" placeholder="例：111 年度司執字第 12345 號" required>
+          </div>
+          <div class="form-group">
+            <label for="modalCourtName">管轄法院</label>
+            <select id="modalCourtName" class="form-control">
+              <option value="臺中">臺灣臺中地方法院</option>
+              <option value="臺北">臺灣臺北地方法院</option>
+              <option value="新北">臺灣新北地方法院</option>
+              <option value="士林">臺灣士林地方法院</option>
+              <option value="桃園">臺灣桃園地方法院</option>
+              <option value="新竹">臺灣新竹地方法院</option>
+              <option value="苗栗">臺灣苗栗地方法院</option>
+              <option value="彰化">臺灣彰化地方法院</option>
+              <option value="南投">臺灣南投地方法院</option>
+              <option value="雲林">臺灣雲林地方法院</option>
+              <option value="嘉義">臺灣嘉義地方法院</option>
+              <option value="臺南">臺灣臺南地方法院</option>
+              <option value="高雄">臺灣高雄地方法院</option>
+              <option value="橋頭">臺灣橋頭地方法院</option>
+              <option value="屏東">臺灣屏東地方法院</option>
+              <option value="臺東">臺灣臺東地方法院</option>
+              <option value="花蓮">臺灣花蓮地方法院</option>
+              <option value="宜蘭">臺灣宜蘭地方法院</option>
+              <option value="基隆">臺灣基隆地方法院</option>
+              <option value="澎湖">臺灣澎湖地方法院</option>
+              <option value="金門">福建金門地方法院</option>
+              <option value="連江">福建連江地方法院</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="modalPrincipal">債權本金金額 (元) <span style="color:#DC2626;">*</span></label>
+            <input type="number" id="modalPrincipal" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="modalIssueDate">憑證核發日期 <span style="color:#DC2626;">*</span></label>
+            <input type="date" id="modalIssueDate" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="modalGuarantorName">連帶保證人 (選填)</label>
+            <input type="text" id="modalGuarantorName" class="form-control">
+          </div>
+          <div class="form-group">
+            <label for="modalNote">備註紀錄</label>
+            <input type="text" id="modalNote" class="form-control" placeholder="例：已扣薪3期，後離職">
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+          <button type="button" class="btn btn-outline" onclick="closeRecordModal()">取消</button>
+          <button type="submit" class="btn btn-primary">儲存案件</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast 訊息容器 -->
+  <div class="toast-box" id="toastBox"></div>
+
+  <!-- 頁尾 -->
+  <footer class="app-footer">
+    中華民國儲蓄互助協會 督導協同系統 ｜ 智慧法催公文助手與 5 年時效到期鬧鐘 © 2026
+  </footer>
+
+  <!-- 腳本引入 -->
+  <script src="js/court-data.js"></script>
+  <script src="js/core-legal.js"></script>
+  <script src="js/templates.js"></script>
+  <script src="js/scripts.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>

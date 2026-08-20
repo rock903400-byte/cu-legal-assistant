@@ -1,0 +1,19 @@
+{
+  "name": "cu-legal-assistant",
+  "version": "1.0.0",
+  "description": "儲蓄互助社 智慧法催公文助手與 5 年時效到期鬧鐘",
+  "main": "index.html",
+  "scripts": {
+    "test": "node tests/test-core.js",
+    "start": "npx serve ."
+  },
+  "keywords": [
+    "credit-union",
+    "legal-assistant",
+    "debt-collection",
+    "taiwan-law",
+    "statute-of-limitations"
+  ],
+  "author": "rock903400-byte",
+  "license": "MIT"
+}

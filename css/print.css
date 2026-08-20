@@ -1,0 +1,75 @@
+/**
+ * 司法院標準公文 A4 列印排版專用樣式 (print.css)
+ */
+
+@page {
+  size: A4 portrait;
+  margin: 20mm 20mm 20mm 20mm;
+}
+
+@media print {
+  /* 隱藏非公文介面元素 */
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    font-family: '標楷體', 'BiauKai', 'DFKai-SB', 'Times New Roman', serif !important;
+    font-size: 13pt !important;
+    line-height: 1.8 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .navbar,
+  .tab-nav,
+  .nav-actions,
+  .form-grid,
+  .doc-actions-bar,
+  .card-header,
+  .btn,
+  .toast-box,
+  .app-footer,
+  .no-print {
+    display: none !important;
+  }
+
+  .main-layout {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  .tab-content {
+    display: none !important;
+  }
+
+  .tab-content.active {
+    display: block !important;
+  }
+
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .doc-split-view {
+    display: block !important;
+  }
+
+  .doc-form-pane {
+    display: none !important;
+  }
+
+  .doc-preview-pane {
+    border: none !important;
+    box-shadow: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    font-size: 13pt !important;
+    line-height: 2.0 !important;
+    padding: 0 !important;
+    white-space: pre-wrap !important;
+  }
+}
