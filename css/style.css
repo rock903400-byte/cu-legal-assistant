@@ -374,20 +374,21 @@ body {
    ========================================================================== */
 .a4-paper-wrapper {
   background: #E2E8F0;
-  padding: 20px;
+  padding: 24px 16px;
   border-radius: 12px;
-  display: flex;
-  justify-content: center;
   overflow-y: auto;
   max-height: 760px;
+  box-sizing: border-box;
 }
 
 .a4-paper-sheet {
   background: #FFFFFF;
   width: 100%;
   max-width: 720px;
-  min-height: 700px;
-  padding: 36px 40px;
+  min-height: 720px;
+  height: auto;
+  margin: 0 auto;
+  padding: 40px 44px;
   border-radius: 4px;
   box-shadow: 0 8px 30px rgba(15, 41, 66, 0.12);
   border: 1px solid #CBD5E1;
@@ -396,7 +397,8 @@ body {
   line-height: 2.1;
   color: #0F172A;
   white-space: pre-wrap;
-  position: relative;
+  word-break: break-word;
+  box-sizing: border-box;
   text-align: justify;
 }
 
