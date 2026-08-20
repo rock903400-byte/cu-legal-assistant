@@ -150,6 +150,9 @@
                   <span id="rateWarningBadge" style="display:none; color:#DC2626; font-size:0.75rem; font-weight:800;">⚠️ 逾 16% 上限</span>
                 </label>
                 <input type="number" step="0.1" id="docInterestRate" class="form-control" value="6.5">
+                <div class="form-hint" style="color:var(--navy-accent); margin-top:2px;">
+                  💡 提示：自 110/7/20 起，民法第 205 條約定利率上限為年息 16%，超過部分無效；互助社放款規章通常以年息 12%（月息 1%）為限。
+                </div>
               </div>
               <div class="form-group">
                 <label for="docLastPaymentDate">最後繳息日 / 起算日</label>
@@ -368,9 +371,10 @@
               <span class="badge badge-success">115 年度衛福部最新標準</span>
             </div>
 
-            <p style="font-size:0.88rem; color:var(--sub-text); margin-bottom:16px;">
-              依據《強制執行法》第 115 條之 1 及第 122 條規定：薪資扣押原則以 1/3 為限，且扣除後餘額不得低於「當地最低生活費之 1.2 倍 ＋ 扶養親屬必要支出」。
-            </p>
+            <!-- 官方標準與法規依據提示框 -->
+            <div class="alert-box info" style="margin-bottom:16px;">
+              <strong>📋 官方公告標準與法規依據：</strong>本試算依據 <strong>115 年度衛生福利部及各直轄市、縣市政府最新公告之最低生活費標準</strong>，並依《強制執行法》第 115 條之 1 及第 122 條規定加計 <strong>1.2 倍生活保障基準</strong> 與受扶養親屬之必要支出進行精算。
+            </div>
 
             <div class="form-grid">
               <div class="form-group">
@@ -379,16 +383,16 @@
               </div>
 
               <div class="form-group">
-                <label for="salaryRegion">債務人居住縣市（最低生活費標準）</label>
+                <label for="salaryRegion">債務人居住縣市（115年度最低生活費與1.2倍標準）</label>
                 <select id="salaryRegion" class="form-control" style="font-weight:700;">
-                  <option value="taichung" selected>臺中市（16,431 元/月）</option>
-                  <option value="taipei">臺北市（20,744 元/月）</option>
-                  <option value="new_taipei">新北市（17,750 元/月）</option>
-                  <option value="taoyuan">桃園市（17,186 元/月）</option>
-                  <option value="tainan">臺南市（15,515 元/月）</option>
-                  <option value="kaohsiung">高雄市（16,970 元/月）</option>
-                  <option value="taiwan_province">臺灣省各縣市 (彰投苗雲嘉屏東花宜基澎)（15,515 元/月）</option>
-                  <option value="kinmen_lienchiang">金門縣、連江縣（14,064 元/月）</option>
+                  <option value="taichung" selected>臺中市（115年度 16,431 元/月，1.2倍基準為 19,717 元）</option>
+                  <option value="taipei">臺北市（115年度 20,744 元/月，1.2倍基準為 24,893 元）</option>
+                  <option value="new_taipei">新北市（115年度 17,750 元/月，1.2倍基準為 21,300 元）</option>
+                  <option value="taoyuan">桃園市（115年度 17,186 元/月，1.2倍基準為 20,623 元）</option>
+                  <option value="tainan">臺南市（115年度 15,515 元/月，1.2倍基準為 18,618 元）</option>
+                  <option value="kaohsiung">高雄市（115年度 16,970 元/月，1.2倍基準為 20,364 元）</option>
+                  <option value="taiwan_province">臺灣省各縣市 (彰投苗雲嘉屏東花宜基澎)（115年度 15,515 元/月，1.2倍基準為 18,618 元）</option>
+                  <option value="kinmen_lienchiang">金門縣、連江縣（115年度 14,064 元/月，1.2倍基準為 16,877 元）</option>
                 </select>
               </div>
 
