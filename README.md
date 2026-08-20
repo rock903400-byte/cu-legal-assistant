@@ -1,9 +1,12 @@
 # 儲蓄互助社 智慧法催公文助手與 5 年時效到期鬧鐘
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Deploy to GitHub Pages](https://github.com/rock903400-byte/cu-legal-assistant/actions/workflows/deploy.yml/badge.svg)](https://github.com/rock903400-byte/cu-legal-assistant/actions/workflows/deploy.yml)
+[![Cloudflare Pages](https://img.shields.io/badge/Deploy-Cloudflare%20Pages-orange?logo=cloudflare)](https://cu-legal-assistant.pages.dev/)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-cu--legal--assistant-181717?logo=github)](https://github.com/rock903400-byte/cu-legal-assistant)
 
 > 專為儲蓄互助社量身打造的**「純前端本地運算・零個資外洩・司法院標準訴狀」**智慧法催公文助手與 5 年時效到期鬧鐘系統。
+
+🔗 **線上正式版網址**：[https://cu-legal-assistant.pages.dev/](https://cu-legal-assistant.pages.dev/)
 
 ---
 
@@ -51,15 +54,11 @@
 
 ## 🚀 快速開始
 
-### 1. 單機直接使用
-直接使用瀏覽器開啟專案目錄下的 `index.html` 即可完整使用所有功能，完全支援離線操作。
+### 1. 線上直接使用
+直接開啟 [https://cu-legal-assistant.pages.dev/](https://cu-legal-assistant.pages.dev/) 即可使用。
 
-### 2. 本機伺服器啟動
-```bash
-# 啟動本機伺服器
-npm start
-```
-開啟瀏覽器前往 `http://localhost:3000` 或 `http://localhost:5000`。
+### 2. 單機直接使用
+直接使用瀏覽器開啟專案目錄下的 `index.html` 即可完整使用所有功能，完全支援離線操作。
 
 ### 3. 執行單元測試
 ```bash
