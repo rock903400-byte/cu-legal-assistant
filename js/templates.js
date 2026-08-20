@@ -1,8 +1,8 @@
 /**
  * 司法院標準公文與儲互社法催範本庫 (templates.js)
  * 包含：
- * 1. 民事支付命令聲請狀
- * 2. 民事強制執行聲請狀 (含扣押保險解約金、扣押銀行存款、扣薪、查調所得等)
+ * 1. 民事支付命令聲請狀 (含用印指引)
+ * 2. 民事強制執行聲請狀 (含扣押保險解約金、扣押銀行存款、扣薪、查調所得等與用印指引)
  * 3. 民事聲請換發債權憑證狀
  * 4. 社員逾期放款以留存股金及股息抵銷借款通知書 (儲蓄互助社法第 14 條)
  * 5. 理監事會審議逾期放款行使股金抵銷權簽呈
@@ -135,8 +135,8 @@ ${data.hasGuarantor && data.guarantorName ? '三、連帶保證人保證條款�
 
 中  華  民  國  ${roc.rocYear}  年  ${roc.month}  月  ${roc.day}  日
 
-具狀人（即聲請人）：${data.creditorName || '有限責任○○儲蓄互助社'}
-法定代理人：${data.creditorRep || ''}
+具狀人（即聲請人）：${data.creditorName || '有限責任○○儲蓄互助社'}  [ 蓋社圖記 (大章) ]
+法定代理人：${data.creditorRep || ''}  [ 理事長簽章 (小章) ]
 `;
 
   return docText;
@@ -246,8 +246,8 @@ ${data.targets && data.targets.insurance ? '三、最高法院 108 年度台抗�
 
 中  華  民  國  ${roc.rocYear}  年  ${roc.month}  月  ${roc.day}  日
 
-具狀人（即聲請人）：${data.creditorName || '有限責任○○儲蓄互助社'}
-法定代理人：${data.creditorRep || ''}
+具狀人（即聲請人）：${data.creditorName || '有限責任○○儲蓄互助社'}  [ 蓋社圖記 (大章) ]
+法定代理人：${data.creditorRep || ''}  [ 理事長簽章 (小章) ]
 `;
 
   return docText;
@@ -287,8 +287,8 @@ ${data.hasGuarantor && data.guarantorName ? '連帶保證人：' + data.guaranto
 
 中  華  民  國  ${roc.rocYear}  年  ${roc.month}  月  ${roc.day}  日
 
-具狀人（即聲請人）：${data.creditorName || '有限責任○○儲蓄互助社'}
-法定代理人：${data.creditorRep || ''}
+具狀人（即聲請人）：${data.creditorName || '有限責任○○儲蓄互助社'}  [ 蓋社圖記 (大章) ]
+法定代理人：${data.creditorRep || ''}  [ 理事長簽章 (小章) ]
 `;
 
   return docText;
@@ -333,8 +333,8 @@ function generateOffsetShareDoc(data) {
 此致
 ${data.debtorName || '○○○'} 社員
 
-${data.creditorName || '有限責任○○儲蓄互助社'}
-法定代理人（理事長）：${data.creditorRep || ''}
+${data.creditorName || '有限責任○○儲蓄互助社'}  [ 蓋社圖記 (大章) ]
+法定代理人（理事長）：${data.creditorRep || ''}  [ 理事長簽章 (小章) ]
 社址：${data.creditorAddress || ''}
 電話：${data.creditorPhone || ''}
 `;
@@ -367,7 +367,7 @@ function generateOffsetBoardResolutionDoc(data) {
 擬辦：
 請 理事會審議核決。
 
-承辦專職：${data.agentName || '李專職'}      放款委員會召集人：           理事長：${data.creditorRep || '陳理事長'}
+承辦專職：${data.agentName || '李專職'} [簽名]      放款委員會召集人： [簽名]          理事長：${data.creditorRep || '陳理事長'} [蓋章]
 `;
 }
 
@@ -404,8 +404,8 @@ function generateHouseholdApplyDoc(data) {
 此致
 ${data.householdOffice || '○○市○○區戶政事務所'}
 
-申請人：${data.creditorName || '有限責任○○儲蓄互助社'}
-法定代理人：${data.creditorRep || ''}
+申請人：${data.creditorName || '有限責任○○儲蓄互助社'}  [ 蓋社圖記 (大章) ]
+法定代理人：${data.creditorRep || ''}  [ 理事長簽章 (小章) ]
 受任人：${data.agentName || '李專職'} （簽章）
 `;
 }
@@ -446,8 +446,8 @@ function generateInheritanceInquiryDoc(data) {
 
 中  華  民  國  ${roc.rocYear}  年  ${roc.month}  月  ${roc.day}  日
 
-具狀人（即聲請人）：${data.creditorName || '有限責任○○儲蓄互助社'}
-法定代理人：${data.creditorRep || ''}
+具狀人（即聲請人）：${data.creditorName || '有限責任○○儲蓄互助社'}  [ 蓋社圖記 (大章) ]
+法定代理人：${data.creditorRep || ''}  [ 理事長簽章 (小章) ]
 `;
 }
 
@@ -458,7 +458,7 @@ function generateInheritanceDemandDoc(data) {
   const roc = getRocDateHelper();
   const principal = Number(data.principal) || 0;
   return `【${data.creditorName || '有限責任○○儲蓄互助社'}】
-函件文號：${data.docNo || '互社放催字第 ○○○○ 號'}
+函件文號：${data.docNo || '互社放催字第 ○○○事 號'}
 發文日期：中華民國 ${roc.rocYear} 年 ${roc.month} 月 ${roc.day} 日
 受文者：被繼承人 ${data.debtorName || '○○○'} 之全體法定繼承人（如戶籍名冊）
 住址：${data.heirAddress || '各繼承人現戶住址'}
@@ -474,8 +474,8 @@ function generateInheritanceDemandDoc(data) {
 此致
 被繼承人 ${data.debtorName || '○○○'} 之全體繼承人
 
-${data.creditorName || '有限責任○○儲蓄互助社'}
-法定代理人（理事長）：${data.creditorRep || ''}
+${data.creditorName || '有限責任○○儲蓄互助社'}  [ 蓋社圖記 (大章) ]
+法定代理人（理事長）：${data.creditorRep || ''}  [ 理事長簽章 (小章) ]
 社址：${data.creditorAddress || ''}
 電話：${data.creditorPhone || ''}
 `;

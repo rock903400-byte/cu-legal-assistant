@@ -322,16 +322,18 @@
           </div>
         </div>
 
-        <!-- 右側：即時排版預覽與公文操作 -->
+        <!-- 右側：A4 擬真紙張排版預覽與公文操作 -->
         <div class="doc-preview-container">
           <div class="card" style="height:100%; display:flex; flex-direction:column;">
             <div class="card-header">
-              <h2 class="card-title">📄 公文書狀即時預覽</h2>
-              <span class="badge badge-success">標準排版・支援 Word 匯出</span>
+              <h2 class="card-title">📄 公文書狀擬真預覽</h2>
+              <span class="badge badge-success">A4 擬真・標楷體・用印導引</span>
             </div>
 
-            <!-- 公文內容預覽區塊 -->
-            <pre class="doc-preview-pane" id="docPreviewText"></pre>
+            <!-- A4 擬真白色紙張排版區塊 -->
+            <div class="a4-paper-wrapper">
+              <pre class="a4-paper-sheet" id="docPreviewText"></pre>
+            </div>
 
             <!-- 操作按鈕列 -->
             <div class="doc-actions-bar">
@@ -419,7 +421,7 @@
           </div>
         </div>
 
-        <!-- 右側：試算結果呈現 -->
+        <!-- 右側：試算結果呈現 (含 100% 堆疊條) -->
         <div class="doc-preview-container">
           <div class="card">
             <div class="card-header">
@@ -444,7 +446,7 @@
           <div>
             <h2 class="card-title">⏰ 債權憑證 5 年消滅時效管理台帳</h2>
             <p style="font-size:0.85rem; color:var(--muted); margin-top:4px;">
-              依民法第 126 條及第 137 條第 3 項：憑證核發滿 5 年時效消滅。系統自動倒數並於屆滿前 6 個月主動提醒換證。
+              依民法第 126 條及第 137 條第 3 項：憑證核發滿 5 年時效消滅。點擊下方 KPI 卡片可即時篩選案件。
             </p>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -467,29 +469,29 @@
           </div>
         </div>
 
-        <!-- KPI 警戒指標看板 (Statute KPI Metrics) -->
+        <!-- KPI 警戒指標看板 (可點擊即時篩選) -->
         <div class="kpi-grid" id="ledgerKpiGrid">
-          <div class="kpi-card kpi-total">
+          <div class="kpi-card kpi-total active" data-filter="all" title="點擊檢視全部案件">
             <div class="kpi-label">總列管憑證數</div>
             <div class="kpi-val" id="kpiTotalCount">0</div>
             <div class="kpi-sub" id="kpiTotalPrincipal">總債權本金 NT$ 0</div>
           </div>
-          <div class="kpi-card kpi-urgent">
+          <div class="kpi-card kpi-urgent" data-filter="urgent" title="點擊僅檢視 90 天內緊急案件">
             <div class="kpi-label">🔴 90天內緊急換證</div>
             <div class="kpi-val" id="kpiUrgentCount" style="color:#DC2626;">0</div>
             <div class="kpi-sub">請立即具狀聲請換證</div>
           </div>
-          <div class="kpi-card kpi-warning">
+          <div class="kpi-card kpi-warning" data-filter="warning" title="點擊僅檢視 180 天內預警案件">
             <div class="kpi-label">🟡 180天內時效預警</div>
             <div class="kpi-val" id="kpiWarningCount" style="color:#D97706;">0</div>
             <div class="kpi-sub">半年內屆滿，準備書狀</div>
           </div>
-          <div class="kpi-card kpi-safe">
+          <div class="kpi-card kpi-safe" data-filter="safe" title="點擊僅檢視安全期案件">
             <div class="kpi-label">🟢 安全期 (>180天)</div>
             <div class="kpi-val" id="kpiSafeCount" style="color:#15803D;">0</div>
             <div class="kpi-sub">時效狀態正常維護中</div>
           </div>
-          <div class="kpi-card kpi-expired">
+          <div class="kpi-card kpi-expired" data-filter="expired" title="點擊檢視已逾期案件">
             <div class="kpi-label">⚫ 已逾 5 年時效</div>
             <div class="kpi-val" id="kpiExpiredCount" style="color:#475569;">0</div>
             <div class="kpi-sub">可能已罹於時效消滅</div>
@@ -504,15 +506,15 @@
           <div style="width:200px;">
             <select id="ledgerFilter" class="form-control">
               <option value="all">全部時效狀態</option>
-              <option value="safe">🟢 安全期 (>180天)</option>
-              <option value="warning">🟡 預警期 (90~180天)</option>
               <option value="urgent">🔴 緊急告急 (<90天)</option>
+              <option value="warning">🟡 預警期 (90~180天)</option>
+              <option value="safe">🟢 安全期 (>180天)</option>
               <option value="expired">⚫ 已逾期</option>
             </select>
           </div>
         </div>
 
-        <!-- 台帳清單表格 -->
+        <!-- 台帳清單表格 (含 5 年動態進度條) -->
         <div class="table-responsive">
           <table class="ledger-table">
             <thead>
@@ -522,7 +524,7 @@
                 <th>管轄法院</th>
                 <th>債權本金</th>
                 <th>核發日期</th>
-                <th>5年到期日 (剩餘天數)</th>
+                <th>5年生命週期與進度</th>
                 <th>時效狀態</th>
                 <th style="width:210px;">操作</th>
               </tr>
@@ -746,7 +748,7 @@
       </div>
       <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
         <button type="button" class="btn btn-outline" onclick="document.getElementById('profileModal').style.display='none'">取消</button>
-        <button type="button" class="btn btn-primary" id="saveProfileBtn" onclick="document.getElementById('profileModal').style.display='none'">儲存設定</button>
+        <button type="submit" class="btn btn-primary" id="saveProfileBtn" onclick="document.getElementById('profileModal').style.display='none'">儲存設定</button>
       </div>
     </div>
   </div>

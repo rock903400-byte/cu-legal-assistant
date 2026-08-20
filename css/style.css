@@ -5,11 +5,15 @@
   --navy-accent: #1D4ED8;
   --navy-hover: #1E40AF;
   
+  --emerald-primary: #059669;
+  --emerald-light: #ECFDF5;
+  --emerald-dark: #065F46;
+
   --ink: #0F172A;
   --sub-text: #475569;
   --muted: #64748B;
   --border: #CBD5E1;
-  --bg-page: #F8FAFC;
+  --bg-page: #F1F5F9;
   --bg-card: #FFFFFF;
 
   --success-bg: #EBF8EE;
@@ -25,6 +29,7 @@
   --danger-text: #7F1D1D;
 
   --font-family: system-ui, -apple-system, 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
+  --font-kai: '標楷體', 'DFKai-SB', 'BiauKai', 'Times New Roman', serif;
 }
 
 * {
@@ -45,17 +50,17 @@ body {
 
 /* 頂部導航列 */
 .navbar {
-  background: var(--navy-primary);
+  background: linear-gradient(135deg, #0F2942 0%, #1E3A8A 100%);
   color: #fff;
   padding: 16px 24px;
-  box-shadow: 0 4px 12px rgba(15, 41, 66, 0.15);
+  box-shadow: 0 4px 14px rgba(15, 41, 66, 0.2);
   position: sticky;
   top: 0;
   z-index: 100;
 }
 
 .nav-container {
-  max-width: 1200px;
+  max-width: 1240px;
   margin: 0 auto;
   display: flex;
   align-items: center;
@@ -71,12 +76,13 @@ body {
 }
 
 .brand-icon {
-  font-size: 1.8rem;
+  font-size: 2rem;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
 }
 
 .brand-text h1 {
-  font-size: 1.3rem;
-  font-weight: 800;
+  font-size: 1.35rem;
+  font-weight: 900;
   letter-spacing: 0.5px;
   color: #fff;
 }
@@ -95,7 +101,7 @@ body {
 
 /* 主要版面容器 */
 .main-layout {
-  max-width: 1200px;
+  max-width: 1240px;
   margin: 24px auto;
   padding: 0 16px;
   flex: 1;
@@ -112,6 +118,7 @@ body {
   margin-bottom: 24px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
 }
 
 .tab-btn {
@@ -135,13 +142,13 @@ body {
 
 .tab-btn:hover {
   color: var(--navy-primary);
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .tab-btn.active {
   background: #fff;
   color: var(--navy-accent);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
 }
 
 /* 分頁內容 */
@@ -163,10 +170,10 @@ body {
 .card {
   background: var(--bg-card);
   border: 1.5px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 24px;
   margin-bottom: 24px;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
 .card-header {
@@ -182,33 +189,44 @@ body {
 
 .card-title {
   font-size: 1.25rem;
-  font-weight: 800;
+  font-weight: 900;
   color: var(--navy-primary);
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-/* KPI 看板卡片 (Statute Metrics) */
+/* ==========================================================================
+   1. KPI 看板卡片 (可點擊互動篩選)
+   ========================================================================== */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 14px;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 
 .kpi-card {
   background: #fff;
   border: 1.5px solid var(--border);
-  border-radius: 10px;
-  padding: 16px;
+  border-radius: 12px;
+  padding: 16px 18px;
   text-align: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
-  transition: transform 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  user-select: none;
 }
 
 .kpi-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+.kpi-card.active {
+  box-shadow: 0 0 0 3px var(--navy-accent), 0 8px 18px rgba(29, 78, 216, 0.15);
+  border-color: var(--navy-accent);
 }
 
 .kpi-card.kpi-total { border-top: 4px solid var(--navy-accent); }
@@ -218,22 +236,22 @@ body {
 .kpi-card.kpi-expired { border-top: 4px solid #475569; background: #F1F5F9; }
 
 .kpi-label {
-  font-size: 0.84rem;
-  font-weight: 700;
+  font-size: 0.86rem;
+  font-weight: 800;
   color: var(--sub-text);
   margin-bottom: 4px;
 }
 
 .kpi-val {
-  font-size: 1.65rem;
+  font-size: 1.75rem;
   font-weight: 900;
   color: var(--navy-primary);
 }
 
 .kpi-sub {
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   color: var(--muted);
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .badge {
@@ -249,6 +267,151 @@ body {
 .badge-warning { background: var(--warning-bg); color: var(--warning-border); border: 1px solid #FDE68A; }
 .badge-danger { background: var(--danger-bg); color: var(--danger-border); border: 1px solid #FECACA; }
 .badge-dark { background: #E2E8F0; color: #334155; }
+
+/* ==========================================================================
+   2. 5 年生命週期動態進度條 (Progress Bar & Pulse)
+   ========================================================================== */
+.statute-progress-wrap {
+  width: 100%;
+  height: 7px;
+  background: #E2E8F0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.statute-progress-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.statute-progress-bar.safe {
+  background: #15803D;
+}
+
+.statute-progress-bar.warning {
+  background: #D97706;
+}
+
+.statute-progress-bar.urgent {
+  background: #DC2626;
+  animation: pulseUrgent 1.8s infinite ease-in-out;
+}
+
+.statute-progress-bar.expired {
+  background: #475569;
+}
+
+@keyframes pulseUrgent {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* ==========================================================================
+   3. 扣薪 100% 薪資結構堆疊分配條 (Stacked Bar Chart)
+   ========================================================================== */
+.salary-stacked-bar-container {
+  margin: 18px 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.salary-stacked-bar {
+  display: flex;
+  width: 100%;
+  height: 32px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+  background: #E2E8F0;
+}
+
+.stacked-seg {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  transition: width 0.3s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+}
+
+.seg-personal { background: #2563EB; } /* 藍色：本人最低生活保障 1.2倍 */
+.seg-dependents { background: #D97706; } /* 琥珀色：扶養親屬保障 */
+.seg-garnishable { background: #DC2626; } /* 紅色：法院合法扣押上限 */
+.seg-exempt { background: #64748B; } /* 灰色：不足額免扣押 */
+
+.stacked-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 0.84rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+/* ==========================================================================
+   4. A4 擬真紙張與用印引導框 (A4 Realistic Sheet & Stamp Guides)
+   ========================================================================== */
+.a4-paper-wrapper {
+  background: #E2E8F0;
+  padding: 20px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  overflow-y: auto;
+  max-height: 760px;
+}
+
+.a4-paper-sheet {
+  background: #FFFFFF;
+  width: 100%;
+  max-width: 720px;
+  min-height: 700px;
+  padding: 36px 40px;
+  border-radius: 4px;
+  box-shadow: 0 8px 30px rgba(15, 41, 66, 0.12);
+  border: 1px solid #CBD5E1;
+  font-family: var(--font-kai);
+  font-size: 1.05rem;
+  line-height: 2.1;
+  color: #0F172A;
+  white-space: pre-wrap;
+  position: relative;
+  text-align: justify;
+}
+
+.stamp-guide-tag {
+  display: inline-block;
+  border: 1.5px dashed #DC2626;
+  background: rgba(220, 38, 38, 0.05);
+  color: #DC2626;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  margin-left: 6px;
+  vertical-align: middle;
+}
 
 /* 表單元件 */
 .form-grid {
@@ -380,7 +543,7 @@ body {
   color: var(--navy-primary);
 }
 
-/* 按鈕樣式 */
+/* 按鈕樣式與微交互 */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -392,7 +555,7 @@ body {
   font-weight: 800;
   border: 1.5px solid transparent;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   font-family: inherit;
   text-decoration: none;
 }
@@ -422,6 +585,14 @@ body {
   background: #1E3F72;
 }
 
+.btn-emerald {
+  background: var(--emerald-primary);
+  color: #fff;
+}
+.btn-emerald:hover {
+  background: var(--emerald-dark);
+}
+
 .btn-warning {
   background: #F59E0B;
   color: #0F172A;
@@ -445,6 +616,13 @@ body {
   font-size: 0.84rem;
 }
 
+.btn-feedback-success {
+  background: #059669 !important;
+  color: #fff !important;
+  border-color: #059669 !important;
+  transform: scale(1.03);
+}
+
 /* 雙欄公文排版預覽 */
 .doc-split-view {
   display: grid;
@@ -452,24 +630,10 @@ body {
   gap: 24px;
 }
 
-.doc-preview-pane {
-  background: #fff;
-  border: 1.5px solid var(--border);
-  border-radius: 10px;
-  padding: 24px;
-  font-family: 'Times New Roman', '標楷體', 'BiauKai', 'Noto Serif TC', serif;
-  line-height: 1.85;
-  font-size: 0.98rem;
-  white-space: pre-wrap;
-  max-height: 720px;
-  overflow-y: auto;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.04);
-}
-
 .doc-actions-bar {
   display: flex;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 16px;
   flex-wrap: wrap;
 }
 
@@ -519,7 +683,7 @@ body {
   border: 1.5px solid #BBF7D0;
   border-radius: 10px;
   padding: 20px;
-  margin-top: 18px;
+  margin-top: 14px;
 }
 
 .calc-row {
@@ -537,19 +701,21 @@ body {
 
 .calc-row-highlight {
   background: #DCFCE7;
-  padding: 12px;
-  border-radius: 8px;
+  padding: 14px;
+  border-radius: 10px;
   font-size: 1.15rem;
   font-weight: 900;
   color: #15803D;
-  margin-top: 8px;
+  margin-top: 10px;
+  text-align: center;
 }
 
 /* 台帳表格 */
 .table-responsive {
   overflow-x: auto;
   border: 1.5px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
+  background: #fff;
 }
 
 .ledger-table {
@@ -562,13 +728,13 @@ body {
 .ledger-table th {
   background: var(--navy-primary);
   color: #fff;
-  padding: 12px 14px;
+  padding: 14px 16px;
   font-weight: 800;
   white-space: nowrap;
 }
 
 .ledger-table td {
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
@@ -628,5 +794,9 @@ body {
     min-width: 130px;
     font-size: 0.86rem;
     padding: 10px 10px;
+  }
+  .a4-paper-sheet {
+    padding: 20px;
+    font-size: 0.94rem;
   }
 }

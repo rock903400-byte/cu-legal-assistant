@@ -1,5 +1,5 @@
 /**
- * 主控制器邏輯 (app.js) - 全面升級版
+ * 主控制器邏輯 (app.js) - 全面升級版 (金融級視覺與微交互)
  * 整合：司法院訴狀、股金抵銷、身故繼承、扣薪計算機、時效 KPI 看板、Word 匯出與草稿自動暫存
  */
 
@@ -36,8 +36,21 @@ function triggerDraftSavedIndicator() {
   }, 2000);
 }
 
+// 按鈕微交互：短暫變綠反饋
+function triggerButtonFeedback(btn, feedbackText = '✓ 已複製！') {
+  if (!btn) return;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = feedbackText;
+  btn.classList.add('btn-feedback-success');
+  setTimeout(() => {
+    btn.innerHTML = originalText;
+    btn.classList.remove('btn-feedback-success');
+  }, 1800);
+}
+
 // 複製純文字至剪貼簿
-function copyTextToClipboard(text, successMsg = '已複製至剪貼簿！') {
+function copyTextToClipboard(text, successMsg = '已複製至剪貼簿！', btn = null) {
+  if (btn) triggerButtonFeedback(btn);
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => {
       showToast(successMsg);
@@ -198,7 +211,7 @@ function initScriptsGenerator() {
       const targetId = btn.getAttribute('data-target');
       const textEl = document.getElementById(targetId);
       if (textEl) {
-        copyTextToClipboard(textEl.textContent.trim(), '已複製話術文字！');
+        copyTextToClipboard(textEl.textContent.trim(), '已複製話術文字！', btn);
       }
     });
   });
@@ -308,7 +321,7 @@ function initDocGenerator() {
   if (copyDocBtn) {
     copyDocBtn.addEventListener('click', () => {
       const text = document.getElementById('docPreviewText')?.textContent || '';
-      copyTextToClipboard(text, '✅ 已複製整份公文書狀全文！');
+      copyTextToClipboard(text, '✅ 已複製整份公文書狀全文！', copyDocBtn);
     });
   }
 
@@ -546,7 +559,7 @@ function updateDocPreview() {
 }
 
 /* ==========================================================================
-   6. 強制執行薪資扣押計算機模組
+   6. 強制執行薪資扣押計算機模組 (含 100% 薪資結構堆疊圖)
    ========================================================================== */
 function initSalaryCalculator() {
   const inputs = ['salaryMonthlyIncome', 'salaryRegion', 'salaryDependents', 'salarySupportRatio'];
@@ -593,8 +606,64 @@ function renderSalaryCalculationResult(res) {
     alertHtml = `<div class="alert-box info" style="margin-bottom:14px;">${res.warningMessage}</div>`;
   }
 
+  // 計算薪資結構堆疊條百分比 (100%)
+  const total = res.salary || 1;
+  const personalPct = Math.min(100, Math.round((res.personalCost / total) * 100));
+  const dependentsPct = Math.min(100 - personalPct, Math.round((res.dependentsCost / total) * 100));
+  const garnishablePct = res.isExempt ? 0 : Math.min(100 - personalPct - dependentsPct, Math.round((res.garnishableAmount / total) * 100));
+  const retainedPct = Math.max(0, 100 - personalPct - dependentsPct - garnishablePct);
+
+  let stackedBarHtml = '';
+  if (res.isExempt) {
+    stackedBarHtml = `
+      <div class="salary-stacked-bar-container">
+        <div style="font-size:0.88rem; font-weight:800; color:var(--navy-primary); margin-bottom:8px;">
+          📊 100% 薪資結構分配視覺圖（全額受法律保障，不可扣押）：
+        </div>
+        <div class="salary-stacked-bar">
+          <div class="stacked-seg seg-exempt" style="width: 100%;">
+            100% 全額受法律最低生活保障 (NT$ ${res.salary.toLocaleString()})
+          </div>
+        </div>
+        <div class="stacked-legend">
+          <div class="legend-item"><span class="legend-dot" style="background:#64748B;"></span> <span>法定生活保障（豁免扣押）</span></div>
+        </div>
+      </div>
+    `;
+  } else {
+    stackedBarHtml = `
+      <div class="salary-stacked-bar-container">
+        <div style="font-size:0.88rem; font-weight:800; color:var(--navy-primary); margin-bottom:8px;">
+          📊 100% 薪資結構分配視覺圖：
+        </div>
+        <div class="salary-stacked-bar">
+          <div class="stacked-seg seg-personal" style="width: ${personalPct}%;" title="債務人生活保障：${res.personalCost.toLocaleString()} 元">
+            ${personalPct > 12 ? `本人保障 ${personalPct}%` : ''}
+          </div>
+          ${dependentsPct > 0 ? `
+          <div class="stacked-seg seg-dependents" style="width: ${dependentsPct}%;" title="受扶養親屬保障：${res.dependentsCost.toLocaleString()} 元">
+            ${dependentsPct > 12 ? `扶養 ${dependentsPct}%` : ''}
+          </div>` : ''}
+          ${retainedPct > 0 ? `
+          <div class="stacked-seg" style="width: ${retainedPct}%; background:#10B981;" title="債務人其他保留餘額：${(res.salary - res.totalProtectedLivingCost - res.garnishableAmount).toLocaleString()} 元">
+            ${retainedPct > 12 ? `保留 ${retainedPct}%` : ''}
+          </div>` : ''}
+          <div class="stacked-seg seg-garnishable" style="width: ${garnishablePct}%;" title="法院合法可扣押：${res.garnishableAmount.toLocaleString()} 元">
+            ${garnishablePct > 10 ? `可扣 ${garnishablePct}%` : ''}
+          </div>
+        </div>
+        <div class="stacked-legend">
+          <div class="legend-item"><span class="legend-dot" style="background:#2563EB;"></span> <span>債務人生活保障 (NT$ ${res.personalCost.toLocaleString()})</span></div>
+          ${res.dependents > 0 ? `<div class="legend-item"><span class="legend-dot" style="background:#D97706;"></span> <span>受扶養親屬保障 (NT$ ${res.dependentsCost.toLocaleString()})</span></div>` : ''}
+          <div class="legend-item"><span class="legend-dot" style="background:#DC2626;"></span> <span>法院合法可扣押上限 (NT$ ${res.garnishableAmount.toLocaleString()})</span></div>
+        </div>
+      </div>
+    `;
+  }
+
   wrap.innerHTML = `
     ${alertHtml}
+    ${stackedBarHtml}
     <div class="calc-result-box">
       <div class="calc-row">
         <span>債務人每月薪資總額：</span>
@@ -627,7 +696,7 @@ function renderSalaryCalculationResult(res) {
 
       <div class="calc-row-highlight">
         <div style="font-size:0.9rem; color:#064E3B; font-weight:700; margin-bottom:4px;">法院每月合法可扣押金額：</div>
-        <div style="font-size:1.8rem; font-weight:900;">NT$ ${res.garnishableAmount.toLocaleString()} 元</div>
+        <div style="font-size:1.85rem; font-weight:900;">NT$ ${res.garnishableAmount.toLocaleString()} 元</div>
         <div style="font-size:0.85rem; color:#047857; margin-top:4px;">
           債務人每月保留生活費：NT$ ${res.retainedAmount.toLocaleString()} 元
         </div>
@@ -637,7 +706,7 @@ function renderSalaryCalculationResult(res) {
 }
 
 /* ==========================================================================
-   7. 5 年消滅時效鬧鐘與台帳管理
+   7. 5 年消滅時效鬧鐘與台帳管理 (可點擊 KPI 與動態進度條)
    ========================================================================== */
 function initLedger() {
   renderLedgerKpis();
@@ -653,9 +722,21 @@ function initLedger() {
   const filterSelect = document.getElementById('ledgerFilter');
   if (filterSelect) {
     filterSelect.addEventListener('change', () => {
+      highlightActiveKpi(filterSelect.value);
       renderLedgerTable(searchInput?.value.trim(), filterSelect.value);
     });
   }
+
+  // 為頂部 KPI 卡片綁定點擊即時篩選
+  const kpiCards = document.querySelectorAll('.kpi-card');
+  kpiCards.forEach(card => {
+    card.addEventListener('click', () => {
+      const filterType = card.getAttribute('data-filter') || 'all';
+      if (filterSelect) filterSelect.value = filterType;
+      highlightActiveKpi(filterType);
+      renderLedgerTable(searchInput?.value.trim(), filterType);
+    });
+  });
 
   const addBtn = document.getElementById('btnAddRecord');
   if (addBtn) {
@@ -743,6 +824,16 @@ function initLedger() {
   }
 }
 
+function highlightActiveKpi(filterType) {
+  document.querySelectorAll('.kpi-card').forEach(c => {
+    if (c.getAttribute('data-filter') === filterType) {
+      c.classList.add('active');
+    } else {
+      c.classList.remove('active');
+    }
+  });
+}
+
 function renderLedgerKpis() {
   const metrics = getLedgerMetrics();
   if (document.getElementById('kpiTotalCount')) document.getElementById('kpiTotalCount').textContent = metrics.total;
@@ -774,7 +865,7 @@ function renderLedgerTable(query = '', filterStatus = 'all') {
   tbody.innerHTML = '';
 
   if (records.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 24px; color: var(--muted);">目前尚無符合的債權憑證案件</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 28px; color: var(--muted);">目前尚無符合條件的債權憑證案件</td></tr>`;
     return;
   }
 
@@ -782,30 +873,51 @@ function renderLedgerTable(query = '', filterStatus = 'all') {
     const tr = document.createElement('tr');
     
     let badgeClass = 'badge-success';
-    if (r.status === 'warning') badgeClass = 'badge-warning';
-    if (r.status === 'urgent') badgeClass = 'badge-danger';
-    if (r.status === 'expired') badgeClass = 'badge-dark';
+    let progressClass = 'safe';
+    if (r.status === 'warning') {
+      badgeClass = 'badge-warning';
+      progressClass = 'warning';
+    }
+    if (r.status === 'urgent') {
+      badgeClass = 'badge-danger';
+      progressClass = 'urgent';
+    }
+    if (r.status === 'expired') {
+      badgeClass = 'badge-dark';
+      progressClass = 'expired';
+    }
+
+    // 計算 5 年生命週期消耗比例 (5年 = 1825天)
+    const totalDays = 1825;
+    const daysLeft = Math.max(0, r.remainingDays || 0);
+    const consumedPct = Math.min(100, Math.max(0, Math.round(((totalDays - daysLeft) / totalDays) * 100)));
 
     tr.innerHTML = `
       <td>
-        <strong>${r.debtorName || '未填'}</strong>
+        <strong style="font-size:0.98rem;">${r.debtorName || '未填'}</strong>
         <div style="font-size:0.8rem; color:var(--muted);">${r.debtorId || ''}</div>
       </td>
       <td>${r.certNo || '未填'}</td>
       <td>${r.courtName || '臺中'}</td>
-      <td>NT$ ${Number(r.principal || 0).toLocaleString()}</td>
+      <td><strong>NT$ ${Number(r.principal || 0).toLocaleString()}</strong></td>
       <td>${r.issueDate || ''}</td>
-      <td>
-        <strong>${r.expiryDateStr || ''}</strong>
-        <div style="font-size:0.8rem; color: ${r.color}; font-weight:800;">
-          ${r.remainingDays > 0 ? `剩餘 ${r.remainingDays} 天` : `已逾期 ${Math.abs(r.remainingDays)} 天`}
+      <td style="min-width:180px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong>${r.expiryDateStr || ''}</strong>
+          <span style="font-size:0.82rem; color:${r.color}; font-weight:900;">
+            ${r.remainingDays > 0 ? `剩 ${r.remainingDays} 天` : `逾期 ${Math.abs(r.remainingDays)} 天`}
+          </span>
+        </div>
+        <!-- 5 年生命週期動態進度條 -->
+        <div class="statute-progress-wrap" title="5年時效已流逝 ${consumedPct}%">
+          <div class="statute-progress-bar ${progressClass}" style="width: ${consumedPct}%;"></div>
         </div>
       </td>
       <td><span class="badge ${badgeClass}">${r.statusText}</span></td>
       <td>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button type="button" class="btn btn-outline btn-sm" onclick="downloadSingleICS('${r.id}')" title="下載此筆行事曆鬧鐘">📅 鬧鐘</button>
-          <button type="button" class="btn btn-primary btn-sm" onclick="triggerRenewDoc('${r.id}')" title="一鍵帶入換發憑證書狀">⚖️ 換證</button>
+          <button type="button" class="btn btn-emerald btn-sm" onclick="triggerRenewDoc('${r.id}')" title="一鍵帶入換發憑證書狀">⚖️ 換證</button>
           <button type="button" class="btn btn-outline btn-sm" onclick="editRecord('${r.id}')">✏️</button>
           <button type="button" class="btn btn-outline btn-sm" style="color:#DC2626;" onclick="handleDeleteRecord('${r.id}')">🗑️</button>
         </div>
