@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="儲蓄互助社智慧法催公文助手與 5 年時效到期鬧鐘：純前端本地運算、零個資外洩、司法院標準訴狀一鍵排版、115年扣薪計算機、股金抵銷通知、拋棄繼承查詢、5年時效管理台帳與行事曆鬧鐘推播。">
   <title>儲蓄互助社 智慧法催公文助手與 5 年時效到期鬧鐘</title>
-  <!-- Cache Busting v2.2.0 -->
-  <link rel="stylesheet" href="css/style.css?v=2.2.0">
-  <link rel="stylesheet" href="css/print.css?v=2.2.0" media="print">
+  <!-- Cache Busting v2.2.1 -->
+  <link rel="stylesheet" href="css/style.css?v=2.2.1">
+  <link rel="stylesheet" href="css/print.css?v=2.2.1" media="print">
 </head>
 <body>
 
@@ -714,9 +714,9 @@
 
   </main>
 
-  <!-- 本社資料設定彈窗 (Profile Modal) -->
-  <div id="profileModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:999; align-items:center; justify-content:center; padding:16px;">
-    <div class="card" style="max-width:550px; width:100%; margin:0; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+  <!-- 本社資料設定彈窗 (Profile Modal - 支援視窗縮放與內部捲動) -->
+  <div id="profileModal" class="modal-overlay">
+    <div class="modal-dialog">
       <div class="card-header">
         <h2 class="card-title">⚙️ 記住本社基本資料</h2>
         <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('profileModal').style.display='none'">✕</button>
@@ -747,16 +747,16 @@
           <input type="text" id="profileAgentName" class="form-control" value="李專職">
         </div>
       </div>
-      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:24px; padding-top:14px; border-top:1px solid var(--border);">
         <button type="button" class="btn btn-outline" onclick="document.getElementById('profileModal').style.display='none'">取消</button>
-        <button type="submit" class="btn btn-primary" id="saveProfileBtn" onclick="document.getElementById('profileModal').style.display='none'">儲存設定</button>
+        <button type="button" class="btn btn-primary" id="saveProfileBtn" onclick="document.getElementById('profileModal').style.display='none'">💾 儲存設定</button>
       </div>
     </div>
   </div>
 
-  <!-- 新增/編輯憑證彈窗 (Record Modal) -->
-  <div id="recordModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:999; align-items:center; justify-content:center; padding:16px;">
-    <div class="card" style="max-width:600px; width:100%; margin:0; max-height:90vh; overflow-y:auto;">
+  <!-- 新增/編輯憑證彈窗 (Record Modal - 支援視窗縮放與內部捲動) -->
+  <div id="recordModal" class="modal-overlay">
+    <div class="modal-dialog">
       <div class="card-header">
         <h2 class="card-title">📝 編輯債權憑證案件</h2>
         <button type="button" class="btn btn-outline btn-sm" onclick="closeRecordModal()">✕</button>
@@ -820,9 +820,9 @@
             <input type="text" id="modalNote" class="form-control" placeholder="例：已扣薪3期，後離職">
           </div>
         </div>
-        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:24px; padding-top:14px; border-top:1px solid var(--border);">
           <button type="button" class="btn btn-outline" onclick="closeRecordModal()">取消</button>
-          <button type="submit" class="btn btn-primary">儲存案件</button>
+          <button type="submit" class="btn btn-primary">💾 儲存案件</button>
         </div>
       </form>
     </div>
@@ -836,14 +836,14 @@
     中華民國儲蓄互助協會 督導協同系統 ｜ 智慧法催公文助手與 5 年時效到期鬧鐘 © 2026
   </footer>
 
-  <!-- 腳本引入 (Cache Busting v2.2.0) -->
-  <script src="js/court-data.js?v=2.2.0"></script>
-  <script src="js/core-legal.js?v=2.2.0"></script>
-  <script src="js/salary-calc.js?v=2.2.0"></script>
-  <script src="js/templates.js?v=2.2.0"></script>
-  <script src="js/scripts.js?v=2.2.0"></script>
-  <script src="js/storage.js?v=2.2.0"></script>
-  <script src="js/app.js?v=2.2.0"></script>
+  <!-- 腳本引入 (Cache Busting v2.2.1) -->
+  <script src="js/court-data.js?v=2.2.1"></script>
+  <script src="js/core-legal.js?v=2.2.1"></script>
+  <script src="js/salary-calc.js?v=2.2.1"></script>
+  <script src="js/templates.js?v=2.2.1"></script>
+  <script src="js/scripts.js?v=2.2.1"></script>
+  <script src="js/storage.js?v=2.2.1"></script>
+  <script src="js/app.js?v=2.2.1"></script>
 
 </body>
 </html>
