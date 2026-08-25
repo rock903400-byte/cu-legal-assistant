@@ -18,6 +18,12 @@ document.addEventListener('DOMContentLoaded', () => {
   initLedger();
   initDemoDataButton();
   restoreDrafts();
+
+  // 管轄法院比對原本只綁在 input 事件上，頁面預填或草稿還原的地址不會觸發，
+  // 導致首次載入時法院停在清單第一項而與地址不符。此處補跑一次。
+  // 必須排在 restoreDrafts() 之後，才能一併涵蓋草稿還原的地址。
+  handleAddressAutoCourt('docDebtorAddress');
+  updateDocPreview();
 });
 
 /**
