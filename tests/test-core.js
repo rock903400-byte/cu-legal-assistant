@@ -194,4 +194,43 @@ assert.strictEqual(icsOutput.includes('BEGIN:VALARM'), true);
 assert.strictEqual(icsOutput.includes('TRIGGER:-P180D'), true);
 console.log('  ✅ iCalendar 鬧鐘推播全部通過');
 
+// 7. 迴歸測試：民法第 121 條第 2 項月末調整與時區位移
+console.log('\n7. 迴歸測試：6 個月期間之月末調整與本地時區');
+// 8/31 加 6 個月，2 月無 31 日 -> 依民法 §121 II 但書以該月末日為期間末日
+assert.strictEqual(calculate6MonthNoticeExpiry('2026-08-31').expiryDateStr, '2027-02-28');
+// 閏年：2024/8/29 加 6 個月 -> 2025 年 2 月僅至 28 日
+assert.strictEqual(calculate6MonthNoticeExpiry('2024-08-29').expiryDateStr, '2025-02-28');
+assert.strictEqual(calculate6MonthNoticeExpiry('2026-03-31').expiryDateStr, '2026-09-30');
+// 不得因 toISOString() 之 UTC 轉換而整日前移
+assert.strictEqual(calculate6MonthNoticeExpiry('2026-01-01').expiryDateStr, '2026-07-01');
+assert.strictEqual(calculate6MonthNoticeExpiry('2026-08-25').expiryDateStr, '2027-02-25');
+console.log('  ✅ 月末調整與時區位移迴歸測試通過');
+
+// 8. 迴歸測試：中文大寫金額溢位不得輸出 undefined
+console.log('\n8. 迴歸測試：中文大寫金額上限防呆');
+assert.strictEqual(toChineseCurrency(9007199254740991).includes('undefined'), false);
+assert.strictEqual(toChineseCurrency(9007199254740991).startsWith('新臺幣'), true);
+const hugeAmount = toChineseCurrency(1e17);
+assert.strictEqual(hugeAmount.includes('undefined'), false);
+assert.strictEqual(hugeAmount.includes('人工填寫'), true);
+console.log('  ✅ 大寫金額溢位防呆通過');
+
+// 9. 迴歸測試：CSV 逸出與公式注入、ICS 特殊字元逸出
+console.log('\n9. 迴歸測試：匯出檔案逸出處理');
+const { csvCell, icsText, foldIcsLines } = require('../js/storage');
+// 雙引號需加倍，否則整份 CSV 錯位
+assert.strictEqual(csvCell('王"大"明'), '"王""大""明"');
+// Excel 公式注入須前置單引號中和
+assert.strictEqual(csvCell('=1+1'), `"'=1+1"`);
+assert.strictEqual(csvCell('@SUM(A1)'), `"'@SUM(A1)"`);
+assert.strictEqual(csvCell(null), '""');
+// ICS 逗號與分號為語法字元，須逸出
+assert.strictEqual(icsText('王大明, 有限責任社; 備註'), '王大明\\, 有限責任社\\; 備註');
+// 長行須依 RFC 5545 摺疊為 75 octets 以內
+const longLine = 'DESCRIPTION:' + '債務人資料'.repeat(40);
+foldIcsLines(longLine).split('\r\n').forEach(l => {
+  assert.strictEqual(Buffer.byteLength(l, 'utf8') <= 76, true);
+});
+console.log('  ✅ CSV / ICS 逸出處理全部通過');
+
 console.log('\n🎉 所有全面升級單元測試全數驗證通過！');

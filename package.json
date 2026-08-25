@@ -1,6 +1,6 @@
 {
   "name": "cu-legal-assistant",
-  "version": "1.0.0",
+  "version": "2.3.0",
   "description": "儲蓄互助社 智慧法催公文助手與 5 年時效到期鬧鐘",
   "main": "index.html",
   "scripts": {

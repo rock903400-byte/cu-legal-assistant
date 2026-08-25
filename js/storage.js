@@ -20,6 +20,92 @@ function calculate5YearExpiryHelper(dateStr) {
   return { status: 'safe', remainingDays: 1800, expiryDateStr: dateStr };
 }
 
+/**
+ * 具配額防護的 localStorage 寫入
+ * 台帳筆數多時 setItem 會拋 QuotaExceededError，未攔截會讓整個存檔動作靜默失敗
+ * @returns {boolean} 是否寫入成功
+ */
+function safeSetItem(key, value) {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    localStorage.setItem(key, value);
+    return true;
+  } catch (e) {
+    console.error('localStorage 寫入失敗（可能已超出瀏覽器儲存配額）', e);
+    return false;
+  }
+}
+
+/**
+ * 今日的本地 YYYY-MM-DD
+ * 不可用 toISOString()，其以 UTC 輸出，在 UTC+8 的深夜時段會標成前一天
+ */
+function todayLocalDateStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * CSV 欄位逸出
+ * 1. 雙引號需成對加倍，否則含引號的姓名會讓整份 CSV 錯位
+ * 2. 以 = + - @ 開頭者，Excel 會視為公式執行（CSV injection），前置單引號中和
+ */
+function csvCell(value) {
+  let str = (value === null || value === undefined) ? '' : String(value);
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = "'" + str;
+  }
+  return '"' + str.replace(/"/g, '""') + '"';
+}
+
+/**
+ * iCalendar 文字逸出 (RFC 5545 3.3.11)
+ * 反斜線、分號、逗號為欄位分隔語法字元，未逸出會破壞事件結構
+ */
+function icsText(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r?\n/g, '\\n');
+}
+
+/**
+ * iCalendar 長行摺疊 (RFC 5545 3.1)：每行不得逾 75 octets
+ * 以 UTF-8 位元組計算，且不可從多位元組字元中間切開
+ */
+function foldIcsLines(content) {
+  const encoder = (str) => (typeof Buffer !== 'undefined')
+    ? Buffer.byteLength(str, 'utf8')
+    : new TextEncoder().encode(str).length;
+
+  return content.split(/\r?\n/).map(line => {
+    if (encoder(line) <= 75) return line;
+
+    const chunks = [];
+    let current = '';
+    let currentBytes = 0;
+    let limit = 75;
+
+    for (const ch of line) {
+      const chBytes = encoder(ch);
+      if (currentBytes + chBytes > limit) {
+        chunks.push(current);
+        current = ch;
+        currentBytes = chBytes;
+        limit = 74; // 後續行前置一個空白，可用額度少 1
+      } else {
+        current += ch;
+        currentBytes += chBytes;
+      }
+    }
+    if (current) chunks.push(current);
+
+    return chunks.join('\r\n ');
+  }).join('\r\n');
+}
+
 const STORAGE_KEYS = {
   RECORDS: 'cu_legal_records_v1',
   PROFILE: 'cu_profile_info_v1',
@@ -69,10 +155,8 @@ function saveRecord(record) {
     list.unshift(updatedRecord);
   }
 
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(list));
-  }
-  return updatedRecord;
+  const saved = safeSetItem(STORAGE_KEYS.RECORDS, JSON.stringify(list));
+  return { ...updatedRecord, saved };
 }
 
 /**
@@ -81,9 +165,7 @@ function saveRecord(record) {
 function deleteRecord(id) {
   let list = loadRecords();
   list = list.filter(r => r.id !== id);
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(list));
-  }
+  safeSetItem(STORAGE_KEYS.RECORDS, JSON.stringify(list));
   return list;
 }
 
@@ -129,14 +211,10 @@ function getLedgerMetrics(records = null) {
  * 儲存表單草稿 (Auto-save)
  */
 function saveDraft(key, data) {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(key, JSON.stringify({
-        data,
-        savedAt: new Date().toISOString()
-      }));
-    }
-  } catch (e) {}
+  return safeSetItem(key, JSON.stringify({
+    data,
+    savedAt: new Date().toISOString()
+  }));
 }
 
 /**
@@ -180,9 +258,7 @@ function loadCuProfile() {
  * 儲存本社預設資訊
  */
 function saveCuProfile(profile) {
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
-  }
+  return safeSetItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
 }
 
 /**
@@ -198,34 +274,41 @@ function generateICSContent(records) {
     const expiryDateCompact = r.expiryDateStr.replace(/-/g, '');
     const amountStr = Number(r.principal || 0).toLocaleString();
 
+    // 所有使用者資料須經 icsText 逸出，姓名或案號含逗號、分號會破壞事件結構
+    const name = icsText(r.debtorName) || '未填';
+    const certNo = icsText(r.certNo) || '未填';
+    const debtorId = icsText(r.debtorId) || '未填';
+    const courtName = icsText(r.courtName) || '未填';
+    const issueDate = icsText(r.issueDate);
+
     events += `BEGIN:VEVENT
 UID:cu-statute-${r.id || Date.now()}@creditunion.local
 DTSTAMP:${nowStr}
 DTSTART;VALUE=DATE:${expiryDateCompact}
 DTEND;VALUE=DATE:${expiryDateCompact}
-SUMMARY:【5年時效到期日】儲互社債權憑證換發 - ${r.debtorName}（${r.certNo || '案號未填'}）
-DESCRIPTION:債務人：${r.debtorName}\\n身分證字號：${r.debtorId || '未填'}\\n債權憑證案號：${r.certNo || '未填'}\\n管轄法院：${r.courtName || '未填'}\\n未償本金：新臺幣 ${amountStr} 元\\n原核發日：${r.issueDate}\\n\\n⚠️ 注意：此債權憑證 5 年消滅時效今日屆滿，請確認已具狀向法院聲請換發債權憑證，以免債權憑證失效變廢紙！
+SUMMARY:【5年時效到期日】儲互社債權憑證換發 - ${name}（${certNo}）
+DESCRIPTION:債務人：${name}\\n身分證字號：${debtorId}\\n債權憑證案號：${certNo}\\n管轄法院：${courtName}\\n未償本金：新臺幣 ${amountStr} 元\\n原核發日：${issueDate}\\n\\n⚠️ 注意：此債權憑證 5 年消滅時效今日屆滿，請確認已具狀向法院聲請換發債權憑證，以免債權憑證失效變廢紙！
 STATUS:CONFIRMED
 BEGIN:VALARM
 ACTION:DISPLAY
-DESCRIPTION:【6個月前提醒】債權憑證 5 年時效將於半年後到期（債務人：${r.debtorName}），請準備向法院具狀換發！
+DESCRIPTION:【6個月前提醒】債權憑證 5 年時效將於半年後到期（債務人：${name}），請準備向法院具狀換發！
 TRIGGER:-P180D
 END:VALARM
 BEGIN:VALARM
 ACTION:DISPLAY
-DESCRIPTION:【3個月前告急】債權憑證 5 年時效將於 90 天後到期（債務人：${r.debtorName}），請立即送件聲請換發債權憑證！
+DESCRIPTION:【3個月前告急】債權憑證 5 年時效將於 90 天後到期（債務人：${name}），請立即送件聲請換發債權憑證！
 TRIGGER:-P90D
 END:VALARM
 BEGIN:VALARM
 ACTION:DISPLAY
-DESCRIPTION:【1個月前最後警告】債權憑證 5 年時效即將屆滿（債務人：${r.debtorName}），請務必於本月完成換證！
+DESCRIPTION:【1個月前最後警告】債權憑證 5 年時效即將屆滿（債務人：${name}），請務必於本月完成換證！
 TRIGGER:-P30D
 END:VALARM
 END:VEVENT
 `;
   }
 
-  return `BEGIN:VCALENDAR
+  const raw = `BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//CULROC//Credit Union Legal Assistant 5-Year Statute Alarm//ZH
 CALSCALE:GREGORIAN
@@ -233,6 +316,8 @@ METHOD:PUBLISH
 X-WR-CALNAME:儲蓄互助社 5 年債權憑證時效鬧鐘
 X-WR-TIMEZONE:Asia/Taipei
 ${events}END:VCALENDAR`;
+
+  return foldIcsLines(raw);
 }
 
 /**
@@ -310,23 +395,24 @@ function exportToWordDoc(filename, title, textContent) {
  */
 function exportRecordsToCSV(records) {
   const headers = ['案件ID', '債務人姓名', '身分證字號', '債權憑證/執行案號', '管轄法院', '債權本金', '核發日期', '5年到期日', '剩餘天數', '時效狀態', '連帶保證人', '備註'];
+  // \u5168\u90E8\u6B04\u4F4D\u4E00\u5F8B\u8D70 csvCell\uFF1A\u7D71\u4E00\u8655\u7406\u96D9\u5F15\u865F\u9038\u51FA\u8207 Excel \u516C\u5F0F\u6CE8\u5165
   const rows = records.map(r => [
-    `"${r.id || ''}"`,
-    `"${r.debtorName || ''}"`,
-    `"${r.debtorId || ''}"`,
-    `"${r.certNo || ''}"`,
-    `"${r.courtName || ''}"`,
-    `"${r.principal || 0}"`,
-    `"${r.issueDate || ''}"`,
-    `"${r.expiryDateStr || ''}"`,
-    `"${r.remainingDays || 0}"`,
-    `"${r.statusText || ''}"`,
-    `"${r.guarantorName || ''}"`,
-    `"${(r.note || '').replace(/"/g, '""')}"`
+    csvCell(r.id),
+    csvCell(r.debtorName),
+    csvCell(r.debtorId),
+    csvCell(r.certNo),
+    csvCell(r.courtName),
+    csvCell(r.principal || 0),
+    csvCell(r.issueDate),
+    csvCell(r.expiryDateStr),
+    csvCell(r.remainingDays || 0),
+    csvCell(r.statusText),
+    csvCell(r.guarantorName),
+    csvCell(r.note)
   ]);
 
-  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\r\n');
-  const dateStr = new Date().toISOString().split('T')[0];
+  const csvContent = '\uFEFF' + [headers.map(csvCell).join(','), ...rows.map(e => e.join(','))].join('\r\n');
+  const dateStr = todayLocalDateStr();
   downloadFile(`儲蓄互助社_債權憑證5年時效管理台帳_${dateStr}.csv`, csvContent, 'text/csv;charset=utf-8;');
 }
 
@@ -336,11 +422,11 @@ function exportRecordsToCSV(records) {
 function exportRecordsToJSON(records) {
   const data = {
     exportedAt: new Date().toISOString(),
-    version: '1.2',
+    version: '2.3.0',
     profile: loadCuProfile(),
     records: records
   };
-  const dateStr = new Date().toISOString().split('T')[0];
+  const dateStr = todayLocalDateStr();
   downloadFile(`儲互社法催資料庫備份_${dateStr}.json`, JSON.stringify(data, null, 2), 'application/json');
 }
 
@@ -353,11 +439,11 @@ function importRecordsFromJSON(jsonText) {
     if (!data.records || !Array.isArray(data.records)) {
       throw new Error('無效的備份檔案格式');
     }
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(data.records));
-      if (data.profile) {
-        localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(data.profile));
-      }
+    if (!safeSetItem(STORAGE_KEYS.RECORDS, JSON.stringify(data.records))) {
+      return { success: false, error: '瀏覽器儲存空間不足，匯入失敗' };
+    }
+    if (data.profile) {
+      safeSetItem(STORAGE_KEYS.PROFILE, JSON.stringify(data.profile));
     }
     return { success: true, count: data.records.length };
   } catch (err) {
@@ -381,6 +467,11 @@ if (typeof module !== 'undefined' && module.exports) {
     exportToWordDoc,
     exportRecordsToCSV,
     exportRecordsToJSON,
-    importRecordsFromJSON
+    importRecordsFromJSON,
+    safeSetItem,
+    csvCell,
+    icsText,
+    foldIcsLines,
+    todayLocalDateStr
   };
 }

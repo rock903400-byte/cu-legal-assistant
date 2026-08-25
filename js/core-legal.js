@@ -14,7 +14,10 @@
  */
 function toChineseCurrency(num) {
   const n = Math.floor(Number(num));
-  if (isNaN(n) || n === 0) return '零元整';
+  if (!Number.isFinite(n) || n === 0) return '零元整';
+  if (!Number.isSafeInteger(n)) {
+    return `⚠️金額 ${num} 超出可精確計算範圍，請人工填寫`;
+  }
   if (n < 0) return '負' + toChineseCurrency(Math.abs(n));
 
   const digits = ['零', '壹', '貳', '參', '肆', '伍', '陸', '柒', '捌', '玖'];
@@ -52,6 +55,8 @@ function toChineseCurrency(num) {
     }
 
     if (groupResult !== '') {
+      // 超出「兆」位 (10^16 以上) 無對應中文單位，避免輸出 undefined
+      if (i >= bigUnits.length) return null;
       result = groupResult + bigUnits[i] + result;
     }
   }
@@ -60,6 +65,10 @@ function toChineseCurrency(num) {
   result = result.replace(/零+/g, '零').replace(/零萬/g, '萬').replace(/零億/g, '億');
   if (result.endsWith('零')) {
     result = result.slice(0, -1);
+  }
+
+  if (result === null) {
+    return `⚠️金額 ${n.toLocaleString()} 超出中文大寫可轉換範圍，請人工填寫`;
   }
 
   return '新臺幣' + result + '元整';
@@ -84,6 +93,33 @@ function validateInterestRate(rate) {
     maxRate: 16,
     warning: ''
   };
+}
+
+/**
+ * 將 Date 物件格式化為本地時區的 YYYY-MM-DD
+ * 不可使用 toISOString()，其會以 UTC 輸出，在 UTC+8 會整天前移一日
+ */
+function formatLocalDate(dateObj) {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * 依民法第 121 條第 2 項加算月份
+ * 但書：最後之月無相當日者，以其月之末日為期間之末日
+ * 例：8/31 加 6 個月 -> 2/28 (而非 JS 預設溢位之 3/3)
+ */
+function addMonthsWithEomAdjust(dateObj, monthsToAdd) {
+  const originalDay = dateObj.getDate();
+  const result = new Date(dateObj.getFullYear(), dateObj.getMonth(), 1);
+  result.setMonth(result.getMonth() + monthsToAdd);
+
+  const lastDayOfTargetMonth = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+  result.setDate(Math.min(originalDay, lastDayOfTargetMonth));
+
+  return result;
 }
 
 /**
@@ -164,8 +200,7 @@ function calculate6MonthNoticeExpiry(noticeDateStr, currentDate = new Date()) {
   const [y, m, d] = noticeDateStr.split('-').map(Number);
   const noticeDate = new Date(y, m - 1, d);
   
-  const expiryDate = new Date(noticeDate);
-  expiryDate.setMonth(expiryDate.getMonth() + 6);
+  const expiryDate = addMonthsWithEomAdjust(noticeDate, 6);
 
   const todayZero = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
   const diffTime = expiryDate.getTime() - todayZero.getTime();
@@ -173,7 +208,7 @@ function calculate6MonthNoticeExpiry(noticeDateStr, currentDate = new Date()) {
 
   return {
     noticeDateStr,
-    expiryDateStr: expiryDate.toISOString().split('T')[0],
+    expiryDateStr: formatLocalDate(expiryDate),
     remainingDays,
     isExpired: remainingDays <= 0
   };
@@ -248,6 +283,8 @@ if (typeof module !== 'undefined' && module.exports) {
     calculateEstimatedInterest,
     calculateCourtFees,
     formatRocDate,
-    getCurrentRocDate
+    getCurrentRocDate,
+    formatLocalDate,
+    addMonthsWithEomAdjust
   };
 }

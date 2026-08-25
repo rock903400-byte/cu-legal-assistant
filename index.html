@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="儲蓄互助社智慧法催公文助手與 5 年時效到期鬧鐘：純前端本地運算、零個資外洩、司法院標準訴狀一鍵排版、115年扣薪計算機、股金抵銷通知、拋棄繼承查詢、5年時效管理台帳與行事曆鬧鐘推播。">
+  <meta name="description" content="儲蓄互助社智慧法催公文助手與 5 年時效到期鬧鐘：純前端本地運算、零個資外洩、司法院標準訴狀一鍵排版（支付命令、強制執行、換發債權憑證）、115年扣薪計算機、5年時效管理台帳與行事曆鬧鐘推播。">
   <title>儲蓄互助社 智慧法催公文助手與 5 年時效到期鬧鐘</title>
   <!-- Cache Busting v2.3.0 -->
   <link rel="stylesheet" href="css/style.css?v=2.3.0">
@@ -18,7 +18,7 @@
         <div class="brand-icon">⚖️</div>
         <div class="brand-text">
           <h1>儲蓄互助社 智慧法催公文助手</h1>
-          <p>司法院標準訴狀 ｜ 115年扣薪試算 ｜ 股金抵銷 ｜ 5 年時效鬧鐘 ｜ 純前端本地零個資外洩</p>
+          <p>支付命令 ｜ 強制執行 ｜ 換發債權憑證 ｜ 115年扣薪試算 ｜ 5 年時效鬧鐘 ｜ 純前端本地零個資外洩</p>
         </div>
       </div>
       <div class="nav-actions">
@@ -76,7 +76,7 @@
     <!-- 分頁選單 (Tab Navigation) -->
     <nav class="tab-nav" aria-label="功能分頁選單">
       <button type="button" class="tab-btn active" data-tab="tab-docs">
-        <span>⚖️</span> 法催與抵銷公文
+        <span>⚖️</span> 法催公文
       </button>
       <button type="button" class="tab-btn" data-tab="tab-salary">
         <span>💰</span> 強制執行扣薪試算
@@ -931,6 +931,7 @@
   </footer>
 
   <!-- 腳本引入 (Cache Busting v2.3.0) -->
+  <script src="js/config.js?v=2.3.0"></script>
   <script src="js/court-data.js?v=2.3.0"></script>
   <script src="js/core-legal.js?v=2.3.0"></script>
   <script src="js/salary-calc.js?v=2.3.0"></script>

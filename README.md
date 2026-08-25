@@ -62,11 +62,23 @@
 ### 1. 線上直接使用
 直接開啟 [https://cu-legal-assistant.pages.dev/](https://cu-legal-assistant.pages.dev/) 即可使用。
 
-### 2. 本機執行測試
+### 2. 本機執行
 ```bash
 cd cu-legal-assistant
-npm test
+npm start          # 於 http://localhost:3000 啟動本機靜態伺服器
 ```
+
+### 3. 執行測試
+```bash
+npm test                      # 核心運算單元測試（含法定期限迴歸測試）
+node tests/test-full-e2e.js   # 全端邏輯驗證
+```
+
+> CI 會在每次 push 與 PR 執行上述兩組測試，未通過則不進行部署（見 `.github/workflows/deploy.yml`）。
+
+### 4. 部署
+- **正式站**：Cloudflare Pages（[cu-legal-assistant.pages.dev](https://cu-legal-assistant.pages.dev/)），由 Cloudflare 的 Git 整合自動建置。
+- **鏡像站**：GitHub Pages，由 `.github/workflows/deploy.yml` 於測試通過後部署。
 
 ---
 
@@ -74,11 +86,12 @@ npm test
 
 ```text
 cu-legal-assistant/
-├── .github/workflows/deploy.yml  # GitHub Pages 自動部署工作流
+├── .github/workflows/deploy.yml  # CI 測試門檻 + GitHub Pages 自動部署工作流
 ├── css/
 │   ├── style.css                 # 系統視覺樣式（海軍藍 #0F2942 專業風格、卡片式 RWD、KPI 看板）
 │   └── print.css                 # 司法院 A4 標準訴狀列印樣式
 ├── js/
+│   ├── config.js                 # 介面功能開關（決定顯示哪些分頁與公文種類）
 │   ├── court-data.js             # 全台 22 所地方法院管轄行政區對照庫
 │   ├── core-legal.js             # 法律核心算法（中文大寫、時效天數、16%利率防呆、規費計算）
 │   ├── salary-calc.js            # 115年強制執行薪資扣押計算機（最低生活費1.2倍與負數防呆）
@@ -87,12 +100,38 @@ cu-legal-assistant/
 │   ├── storage.js                # LocalStorage 本地台帳管理、草稿自動儲存、Word匯出與 .ics 鬧鐘
 │   └── app.js                    # 主控制器與 UI 互動邏輯
 ├── tests/
-│   └── test-core.js              # 核心運算全面單元測試腳本
+│   ├── test-core.js              # 核心運算單元測試（含法定期限、逸出處理迴歸測試）
+│   └── test-full-e2e.js          # 全端深度邏輯驗證
 ├── index.html                    # 系統主入口頁面
 ├── package.json                  # 專案設定檔
 ├── LICENSE                       # MIT License
 └── README.md                     # 專案說明文件
 ```
+
+---
+
+## ⚙️ 介面功能開關
+
+系統預設只呈現**法院法催程序主線**：支付命令 → 強制執行 → 換發債權憑證。
+
+其餘功能（早期關懷話術、法規問答、股金抵銷公文、除戶繼承公文、頂部情境卡片）的**程式碼與版型都完整保留在專案中**，僅由 `js/config.js` 決定是否顯示 —— 改清單即可隨時開回來，不需改動其他檔案。
+
+```js
+// js/config.js
+const APP_CONFIG = {
+  ENABLED_TABS: ['tab-docs', 'tab-salary', 'tab-statute'],
+  ENABLED_DOC_TYPES: ['payment_order', 'execution', 'renew_cert'],
+  SHOW_SCENARIO_NAV: false
+};
+```
+
+| 開關 | 作用 |
+|---|---|
+| `ENABLED_TABS` | 要顯示的分頁；順序即畫面順序，第一個為預設開啟的分頁 |
+| `ENABLED_DOC_TYPES` | 公文種類下拉可選的項目；空掉的分組標題會自動移除 |
+| `SHOW_SCENARIO_NAV` | 頂部 4 張情境導航大卡片 |
+
+完整功能的設定值寫在 `js/config.js` 的檔頭註解中，直接貼回即可恢復原本的 5 分頁 8 公文。
 
 ---
 

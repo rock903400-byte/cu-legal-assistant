@@ -1,3 +1,9 @@
+/* 功能開關用（見 js/config.js）：需覆蓋 .tab-btn / .scenario-nav-grid 等
+   自訂的 display 值，否則瀏覽器預設的 [hidden] 規則會被蓋掉而無效 */
+[hidden] {
+  display: none !important;
+}
+
 :root {
   --navy-primary: #0F2942;
   --navy-dark: #0A1C2E;

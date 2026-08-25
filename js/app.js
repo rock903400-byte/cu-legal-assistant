@@ -7,6 +7,7 @@
 let currentRawDocText = '';
 
 document.addEventListener('DOMContentLoaded', () => {
+  applyUiConfig();
   initScenarioNav();
   initTabs();
   initCourtSelect();
@@ -18,6 +19,21 @@ document.addEventListener('DOMContentLoaded', () => {
   initDemoDataButton();
   restoreDrafts();
 });
+
+/**
+ * HTML 逸出：所有寫入 innerHTML 的使用者資料都必須先過這一層
+ * 資料來源包含 localStorage 與 importRecordsFromJSON 匯入的外部備份檔，
+ * 未逸出即構成儲存型 XSS
+ */
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // Toast 提示
 function showToast(msg) {
@@ -83,7 +99,54 @@ function fallbackCopyText(text, successMsg) {
 }
 
 /* ==========================================================================
-   0. 頂部 4 大情境導航大卡片 (Scenario Navigation)
+   0. 介面功能開關套用 (依 js/config.js 決定顯示哪些分頁與公文)
+   ========================================================================== */
+/**
+ * 依 APP_CONFIG 隱藏未啟用的分頁、公文種類與情境卡片
+ * 一律「隱藏」而非「移除」DOM 節點，讓各 init 函式對隱藏區塊內元素的存取仍然有效，
+ * 也讓設定改回完整清單後不需要動任何其他程式碼
+ */
+function applyUiConfig() {
+  // 1. 分頁按鈕與內容區
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.hidden = !isTabEnabled(btn.getAttribute('data-tab'));
+  });
+  document.querySelectorAll('.tab-content').forEach(section => {
+    if (!isTabEnabled(section.id)) {
+      section.hidden = true;
+      section.classList.remove('active');
+    }
+  });
+
+  // 2. 公文種類下拉：移除未啟用選項，再清掉因此變空的分組標題
+  const docSelect = document.getElementById('docType');
+  if (docSelect) {
+    docSelect.querySelectorAll('option').forEach(opt => {
+      if (!isDocTypeEnabled(opt.value)) opt.remove();
+    });
+    docSelect.querySelectorAll('optgroup').forEach(group => {
+      if (group.querySelectorAll('option').length === 0) group.remove();
+    });
+    if (!isDocTypeEnabled(docSelect.value)) {
+      docSelect.value = getDefaultDocType();
+    }
+  }
+
+  // 3. 頂部情境導航卡片
+  const scenarioNav = document.querySelector('.scenario-nav-grid');
+  if (scenarioNav && !APP_CONFIG.SHOW_SCENARIO_NAV) {
+    scenarioNav.hidden = true;
+  }
+
+  // 4. 確保目前展開的分頁是啟用中的分頁
+  const activeTab = document.querySelector('.tab-content.active');
+  if (!activeTab || !isTabEnabled(activeTab.id)) {
+    switchTab(getDefaultTab());
+  }
+}
+
+/* ==========================================================================
+   0-1. 頂部 4 大情境導航大卡片 (Scenario Navigation)
    ========================================================================== */
 function initScenarioNav() {
   const scenarioCards = document.querySelectorAll('.scenario-card');
@@ -115,6 +178,9 @@ function initTabs() {
 }
 
 function switchTab(tabId) {
+  // 未啟用的分頁不得被叫出來（見 js/config.js）
+  if (!isTabEnabled(tabId)) return;
+
   const tabBtns = document.querySelectorAll('.tab-btn');
   const tabContents = document.querySelectorAll('.tab-content');
 
@@ -196,7 +262,10 @@ function initProfileSettings() {
         cuPhone: document.getElementById('profileCuPhone').value.trim(),
         agentName: document.getElementById('profileAgentName').value.trim()
       };
-      saveCuProfile(updatedProfile);
+      if (!saveCuProfile(updatedProfile)) {
+        showToast('⚠️ 儲存失敗：瀏覽器儲存空間不足或已停用，請檢查隱私設定');
+        return;
+      }
       showToast('✅ 已成功儲存本社預設資料！');
       updateDocFormFromProfile();
       updateScriptFormFromProfile();
@@ -348,7 +417,7 @@ function initDocGenerator() {
       const p = Number(document.getElementById('docPrincipal')?.value) || 0;
       const r = Number(document.getElementById('docInterestRate')?.value) || 0;
       const start = document.getElementById('docInterestStartDate')?.value || document.getElementById('docLastPaymentDate')?.value;
-      const end = new Date().toISOString().split('T')[0];
+      const end = todayLocalDateStr();
       if (p > 0 && r > 0 && start) {
         const est = calculateEstimatedInterest(p, r, start, end);
         document.getElementById('docManualInterest').value = est.interest;
@@ -416,11 +485,14 @@ function initDocGenerator() {
         principal: Number(document.getElementById('docPrincipal')?.value) || 0,
         courtName: document.getElementById('docCourt')?.value || '臺中',
         certNo: document.getElementById('docTitleCaseNo')?.value.trim() || document.getElementById('docCaseNo')?.value.trim() || '新法催案',
-        issueDate: document.getElementById('docLastPaymentDate')?.value || new Date().toISOString().split('T')[0],
+        issueDate: document.getElementById('docLastPaymentDate')?.value || todayLocalDateStr(),
         guarantorName: document.getElementById('docGuarantorName')?.value.trim() || '',
         note: `自公文助手建立 (${document.getElementById('docType')?.value})`
       };
-      saveRecord(record);
+      if (!saveRecord(record).saved) {
+        showToast('⚠️ 儲存失敗：瀏覽器儲存空間不足，請先匯出備份並清理舊案件');
+        return;
+      }
       renderLedgerKpis();
       renderLedgerTable();
       showToast('🎉 已成功將案件加入 5 年消滅時效管理台帳！');
@@ -662,9 +734,9 @@ function renderSalaryCalculationResult(res) {
 
   let alertHtml = '';
   if (res.isExempt) {
-    alertHtml = `<div class="alert-box danger" style="margin-bottom:14px;">${res.warningMessage}</div>`;
+    alertHtml = `<div class="alert-box danger" style="margin-bottom:14px;">${escapeHtml(res.warningMessage)}</div>`;
   } else if (res.warningMessage) {
-    alertHtml = `<div class="alert-box info" style="margin-bottom:14px;">${res.warningMessage}</div>`;
+    alertHtml = `<div class="alert-box info" style="margin-bottom:14px;">${escapeHtml(res.warningMessage)}</div>`;
   }
 
   const total = res.salary || 1;
@@ -730,7 +802,7 @@ function renderSalaryCalculationResult(res) {
         <strong>NT$ ${res.salary.toLocaleString()} 元</strong>
       </div>
       <div class="calc-row">
-        <span>所屬縣市 (${res.regionName}) 115 年最低生活費：</span>
+        <span>所屬縣市 (${escapeHtml(res.regionName)}) 115 年最低生活費：</span>
         <span>NT$ ${res.baseLivingCost.toLocaleString()} 元 / 月</span>
       </div>
       <div class="calc-row">
@@ -771,6 +843,21 @@ function renderSalaryCalculationResult(res) {
 function initLedger() {
   renderLedgerKpis();
   renderLedgerTable();
+
+  const ledgerBody = document.getElementById('ledgerTableBody');
+  if (ledgerBody) {
+    ledgerBody.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-ledger-action]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-record-id');
+      switch (btn.getAttribute('data-ledger-action')) {
+        case 'ics': downloadSingleICS(id); break;
+        case 'renew': triggerRenewDoc(id); break;
+        case 'edit': editRecord(id); break;
+        case 'delete': handleDeleteRecord(id); break;
+      }
+    });
+  }
 
   const searchInput = document.getElementById('ledgerSearch');
   if (searchInput) {
@@ -820,7 +907,10 @@ function initLedger() {
         guarantorName: document.getElementById('modalGuarantorName').value.trim(),
         note: document.getElementById('modalNote').value.trim()
       };
-      saveRecord(record);
+      if (!saveRecord(record).saved) {
+        showToast('⚠️ 儲存失敗：瀏覽器儲存空間不足，請先匯出備份並清理舊案件');
+        return;
+      }
       closeRecordModal();
       renderLedgerKpis();
       renderLedgerTable();
@@ -837,7 +927,7 @@ function initLedger() {
         return;
       }
       const ics = generateICSContent(records);
-      downloadFile(`儲互社_全部憑證5年時效鬧鐘_${new Date().toISOString().split('T')[0]}.ics`, ics, 'text/calendar;charset=utf-8');
+      downloadFile(`儲互社_全部憑證5年時效鬧鐘_${todayLocalDateStr()}.ics`, ics, 'text/calendar;charset=utf-8');
       showToast('📅 已匯出全部案件之 .ics 行事曆鬧鐘檔！');
     });
   }
@@ -947,36 +1037,36 @@ function renderLedgerTable(query = '', filterStatus = 'all') {
     }
 
     const totalDays = 1825;
-    const daysLeft = Math.max(0, r.remainingDays || 0);
+    const daysLeft = Math.max(0, Number(r.remainingDays) || 0);
     const consumedPct = Math.min(100, Math.max(0, Math.round(((totalDays - daysLeft) / totalDays) * 100)));
 
     tr.innerHTML = `
       <td>
-        <strong style="font-size:0.98rem;">${r.debtorName || '未填'}</strong>
-        <div style="font-size:0.8rem; color:var(--muted);">${r.debtorId || ''}</div>
+        <strong style="font-size:0.98rem;">${escapeHtml(r.debtorName) || '未填'}</strong>
+        <div style="font-size:0.8rem; color:var(--muted);">${escapeHtml(r.debtorId)}</div>
       </td>
-      <td>${r.certNo || '未填'}</td>
-      <td>${r.courtName || '臺中'}</td>
+      <td>${escapeHtml(r.certNo) || '未填'}</td>
+      <td>${escapeHtml(r.courtName) || '臺中'}</td>
       <td><strong>NT$ ${Number(r.principal || 0).toLocaleString()}</strong></td>
-      <td>${r.issueDate || ''}</td>
+      <td>${escapeHtml(r.issueDate)}</td>
       <td style="min-width:180px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <strong>${r.expiryDateStr || ''}</strong>
-          <span style="font-size:0.82rem; color:${r.color}; font-weight:900;">
-            ${r.remainingDays > 0 ? `剩 ${r.remainingDays} 天` : `逾期 ${Math.abs(r.remainingDays)} 天`}
+          <strong>${escapeHtml(r.expiryDateStr)}</strong>
+          <span style="font-size:0.82rem; color:${escapeHtml(r.color)}; font-weight:900;">
+            ${daysLeft > 0 ? `剩 ${daysLeft} 天` : `逾期 ${Math.abs(Number(r.remainingDays) || 0)} 天`}
           </span>
         </div>
         <div class="statute-progress-wrap" title="5年時效已流逝 ${consumedPct}%">
           <div class="statute-progress-bar ${progressClass}" style="width: ${consumedPct}%;"></div>
         </div>
       </td>
-      <td><span class="badge ${badgeClass}">${r.statusText}</span></td>
+      <td><span class="badge ${badgeClass}">${escapeHtml(r.statusText)}</span></td>
       <td>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
-          <button type="button" class="btn btn-outline btn-sm" onclick="downloadSingleICS('${r.id}')" title="下載此筆行事曆鬧鐘">📅 鬧鐘</button>
-          <button type="button" class="btn btn-emerald btn-sm" onclick="triggerRenewDoc('${r.id}')" title="一鍵帶入換發憑證書狀">⚖️ 換證</button>
-          <button type="button" class="btn btn-outline btn-sm" onclick="editRecord('${r.id}')">✏️</button>
-          <button type="button" class="btn btn-outline btn-sm" style="color:#DC2626;" onclick="handleDeleteRecord('${r.id}')">🗑️</button>
+          <button type="button" class="btn btn-outline btn-sm" data-ledger-action="ics" data-record-id="${escapeHtml(r.id)}" title="下載此筆行事曆鬧鐘">📅 鬧鐘</button>
+          <button type="button" class="btn btn-emerald btn-sm" data-ledger-action="renew" data-record-id="${escapeHtml(r.id)}" title="一鍵帶入換發憑證書狀">⚖️ 換證</button>
+          <button type="button" class="btn btn-outline btn-sm" data-ledger-action="edit" data-record-id="${escapeHtml(r.id)}">✏️</button>
+          <button type="button" class="btn btn-outline btn-sm" style="color:#DC2626;" data-ledger-action="delete" data-record-id="${escapeHtml(r.id)}">🗑️</button>
         </div>
       </td>
     `;
@@ -1031,7 +1121,7 @@ function openRecordModal(record = null) {
   document.getElementById('modalCertNo').value = record ? record.certNo : '';
   document.getElementById('modalCourtName').value = record ? record.courtName : '臺中';
   document.getElementById('modalPrincipal').value = record ? record.principal : '';
-  document.getElementById('modalIssueDate').value = record ? record.issueDate : new Date().toISOString().split('T')[0];
+  document.getElementById('modalIssueDate').value = record ? record.issueDate : todayLocalDateStr();
   document.getElementById('modalGuarantorName').value = record ? (record.guarantorName || '') : '';
   document.getElementById('modalNote').value = record ? (record.note || '') : '';
 
@@ -1064,7 +1154,11 @@ function restoreDrafts() {
   const docDraft = loadDraft(STORAGE_KEYS.DRAFT_DOC);
   if (docDraft && docDraft.data) {
     const d = docDraft.data;
-    if (d.docType && document.getElementById('docType')) document.getElementById('docType').value = d.docType;
+    // 舊版草稿可能存了現已停用的公文種類（如 offset_share），
+    // 直接套用會讓 #docType 變成下拉中不存在的值，須先驗證
+    if (d.docType && isDocTypeEnabled(d.docType) && document.getElementById('docType')) {
+      document.getElementById('docType').value = d.docType;
+    }
     if (d.debtorName && document.getElementById('docDebtorName')) document.getElementById('docDebtorName').value = d.debtorName;
     if (d.debtorId && document.getElementById('docDebtorId')) document.getElementById('docDebtorId').value = d.debtorId;
     if (d.debtorAddress && document.getElementById('docDebtorAddress')) document.getElementById('docDebtorAddress').value = d.debtorAddress;

@@ -1,7 +1,9 @@
-name: Deploy to GitHub Pages
+name: Test and Deploy to GitHub Pages
 
 on:
   push:
+    branches: [ main, master ]
+  pull_request:
     branches: [ main, master ]
   workflow_dispatch:
 
@@ -15,7 +17,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 法律運算邏輯有誤會直接產出錯誤的法定期限，部署前必須先過測試
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check all modules
+        run: for f in js/*.js; do node --check "$f"; done
+      - name: Core unit tests
+        run: npm test
+      - name: Full-stack E2E tests
+        run: node tests/test-full-e2e.js
+
   deploy:
+    needs: test
+    if: github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
