@@ -372,15 +372,25 @@ function downloadFile(filename, content, mimeType) {
   URL.revokeObjectURL(url);
 }
 
+/** 純文字轉成可安全放進 HTML 的文字（& < >） */
+function escapeHtmlText(value) {
+  return String(value === null || value === undefined ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 /**
- * 匯出 Word (.doc) 格式檔案 (標準標楷體、A4直式橫書、段落縮排)
+ * 產生 Word (.doc) 內容 (標準標楷體、A4直式橫書、段落縮排)
+ * 書狀文字含使用者輸入（姓名、單位名稱），必須逸出：
+ * 未逸出時，名稱中的 < > 會被 Word 當成標籤吃掉，& 也可能造成內容殘缺。
  */
-function exportToWordDoc(filename, title, textContent) {
-  const formattedHtml = `
+function buildWordDocHtml(title, textContent) {
+  return `
     <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
     <head>
       <meta charset='utf-8'>
-      <title>${title}</title>
+      <title>${escapeHtmlText(title)}</title>
       <style>
         @page Section1 {
           size: 595.3pt 841.9pt; /* A4 */
@@ -417,13 +427,18 @@ function exportToWordDoc(filename, title, textContent) {
     </head>
     <body>
       <div class="Section1">
-        <pre>${textContent}</pre>
+        <pre>${escapeHtmlText(textContent)}</pre>
       </div>
     </body>
     </html>
   `;
+}
 
-  downloadFile(`${filename}.doc`, formattedHtml, 'application/msword;charset=utf-8');
+/**
+ * 匯出 Word (.doc) 格式檔案
+ */
+function exportToWordDoc(filename, title, textContent) {
+  downloadFile(`${filename}.doc`, buildWordDocHtml(title, textContent), 'application/msword;charset=utf-8');
 }
 
 /**
@@ -502,6 +517,8 @@ if (typeof module !== 'undefined' && module.exports) {
     generateICSContent,
     generateNoticeDeadlineICS,
     exportToWordDoc,
+    buildWordDocHtml,
+    escapeHtmlText,
     exportRecordsToCSV,
     exportRecordsToJSON,
     importRecordsFromJSON,

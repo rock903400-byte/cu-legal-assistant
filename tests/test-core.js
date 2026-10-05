@@ -37,7 +37,7 @@ const {
   parsePartiesText
 } = require('../js/templates');
 
-const { generateICSContent, generateNoticeDeadlineICS } = require('../js/storage');
+const { generateICSContent, generateNoticeDeadlineICS, buildWordDocHtml } = require('../js/storage');
 const { APP_CONFIG } = require('../js/config');
 
 console.log('🧪 開始執行儲互社法催助手全面單元測試...\n');
@@ -522,5 +522,16 @@ assert.strictEqual(renewDeceased.includes('惟原債務人 王小明 已於 民�
 assert.strictEqual(renewDeceased.includes('二、家事事件公告網路查詢資料一份。'), true);
 assert.strictEqual(renewDefault.includes('（或'), false);
 console.log('  ✅ 第三批功能測試通過');
+
+// 13. 回歸：Word 匯出須逸出使用者輸入（姓名或單位名稱含 & < > 時不可被當成 HTML）
+console.log('\n13. 回歸：Word 匯出逸出');
+const wordHtml = buildWordDocHtml('王&小<明> 法催公文', '債務人：王&小<明>\n公司：A&B <有限公司>');
+assert.strictEqual(wordHtml.includes('<明>') || wordHtml.includes('<有限公司>'), false);
+assert.strictEqual(wordHtml.includes('債務人：王&amp;小&lt;明&gt;'), true);
+assert.strictEqual(wordHtml.includes('公司：A&amp;B &lt;有限公司&gt;'), true);
+assert.strictEqual(wordHtml.includes('<title>王&amp;小&lt;明&gt; 法催公文</title>'), true);
+assert.strictEqual(wordHtml.includes('<pre>') && wordHtml.includes('標楷體') && wordHtml.includes('size: 595.3pt 841.9pt'), true); // 版面設定維持不變
+assert.strictEqual(buildWordDocHtml('t', '').includes('<pre></pre>'), true);
+console.log('  ✅ Word 匯出逸出通過');
 
 console.log('\n🎉 所有全面升級單元測試全數驗證通過！');
