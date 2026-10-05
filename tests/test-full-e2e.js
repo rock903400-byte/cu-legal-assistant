@@ -91,7 +91,7 @@ const doc1 = generatePaymentOrderDoc(testDocData);
 assert(doc1.includes('民事支付命令聲請狀') && doc1.includes('張大同') && doc1.includes('貳拾貳萬肆仟伍佰元整'), '1. 支付命令聲請狀正確包含訴之聲明與中文大寫合計');
 
 const doc2 = generateExecutionDoc(testDocData);
-assert(doc2.includes('民事強制執行聲請狀') && doc2.includes('最高法院 108 年度台抗大字第 897 號') && doc2.includes('保單價值準備金'), '2. 強制執行狀正確包含人身保險大法庭裁定與存款扣押');
+assert(doc2.includes('民事強制執行聲請狀') && doc2.includes('最高法院 108 年度台抗大字第 897 號') && doc2.includes('保險法第 123 條之 1'), '2. 強制執行狀正確包含人身保險大法庭裁定與存款扣押');
 
 // 強制執行狀：e2e 資料含單一指名銀行（舊欄位 bankName）與雇主，須列為第三人
 assert(doc2.includes('第三人：合作金庫') && doc2.includes('第三人：宏達企業社') && doc2.includes('聲請執行之事項'), '2-2. 強制執行狀列出第三人（銀行、雇主）與聲請執行之事項');

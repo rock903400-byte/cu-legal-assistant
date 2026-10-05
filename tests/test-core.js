@@ -545,4 +545,26 @@ assert.strictEqual(html.includes('第 137 條第 3 項'), false);
 assert.strictEqual(html.includes('利息請求權時效 5 年（民法第 126 條）、本金 15 年（第 125 條）'), true);
 console.log('  ✅ 法規核對後的修正測試通過');
 
+// 15. 保險法 2025 年修正（114/6/18 公布施行）：壽險解約金僅逾額度者可執行；健康險、傷害險不得扣押
+console.log('\n15. 強制執行狀：壽險解約金措辭');
+const insDoc = generateExecutionDoc({ ...batch2, targets: { insurance: true } });
+const insLine = insDoc.split('\n').find(l => l.includes('人壽保險商業同業公會'));
+assert.strictEqual(!!insLine, true);
+assert.strictEqual(insLine.includes('債務人為要保人之人壽保險契約'), true);
+assert.strictEqual(insLine.includes('解約金債權金額逾保險法第 123 條之 1 第 1 項所定額度之契約'), true);
+assert.strictEqual(insLine.includes('依同條第 2 項公告不得扣押者除外'), true);
+assert.strictEqual(insLine.includes('健康保險、傷害保險契約，其解約金債權依同法第 129 條之 1、第 132 條之 1 規定不得扣押'), true);
+assert.strictEqual(insLine.includes('最高法院 108 年度台抗大字第 897 號民事大法庭裁定意旨'), true);
+assert.strictEqual(insLine.includes('命第三人保險公司償付解約金'), true); // 大法庭裁定主文用語
+// 舊寫法已過時：不得再要求扣押「所有人身保險」，也不得寫成只扣超過額度的「部分」（超過額度的契約仍可全額執行）
+assert.strictEqual(insLine.includes('所有人身保險契約'), false);
+assert.strictEqual(insLine.includes('逾額度部分') || insLine.includes('超過部分'), false);
+assert.strictEqual(insLine.includes('保單價值準備金'), false);
+// 未勾選時不得出現任何保險相關文字與證物
+const noIns = generateExecutionDoc({ ...batch2, targets: { bankDeposit: true } });
+assert.strictEqual(noIns.includes('保險'), false);
+assert.strictEqual(noIns.includes('台抗大字第 897 號'), false);
+assert.strictEqual(insDoc.includes('最高法院 108 年度台抗大字第 897 號民事大法庭裁定要旨一份'), true); // 證物仍列
+console.log('  ✅ 壽險解約金措辭測試通過');
+
 console.log('\n🎉 所有全面升級單元測試全數驗證通過！');
