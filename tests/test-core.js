@@ -19,7 +19,9 @@ const { findCourtByAddress } = require('../js/court-data');
 
 const {
   MIN_LIVING_EXPENSES_115,
-  calculateSalaryGarnishment
+  calculateSalaryGarnishment,
+  getMinLivingStandard,
+  deriveLivingRegionFromAddress
 } = require('../js/salary-calc');
 
 const {
@@ -32,6 +34,7 @@ const {
   generateInheritanceInquiryDoc,
   generateInheritanceDemandDoc,
   generatePaymentOrderFinalDoc,
+  parseThirdPartiesText,
   generateDemandLetterDoc,
   generateOffsetLetterDoc,
   parsePartiesText
@@ -419,7 +422,7 @@ const pay5 = generatePaymentOrderDoc({ ...withGuarantor2, extraParties: '陳大�
 assert.strictEqual(pay5.includes('債務人（即連帶保證人）：陳大文'), true);
 assert.strictEqual(pay5.includes('並有債務人 李小華、陳大文 為連帶保證人，依法應負連帶清償責任'), true);
 assert.strictEqual(generateExecutionDoc({ ...withGuarantor2, extraParties: '陳大文' }).includes('債務人（即連帶保證人）：陳大文'), true);
-assert.strictEqual(generateRenewCertificateDoc({ ...withGuarantor2, extraParties: '陳大文' }).includes('連帶保證人：陳大文'), true);
+assert.strictEqual(generateRenewCertificateDoc({ ...withGuarantor2, extraParties: '陳大文' }).includes('債務人（即連帶保證人）：陳大文'), true);
 assert.strictEqual(generatePaymentOrderDoc({ ...batch2, hasGuarantor: false, extraParties: '陳大文' }).includes('陳大文'), false); // 未勾選保證人不帶入
 assert.deepStrictEqual(parsePartiesText('甲｜A1｜台北\n\n乙, B2 ,新北\n丙'), [
   { name: '甲', id: 'A1', address: '台北' }, { name: '乙', id: 'B2', address: '新北' }, { name: '丙', id: '', address: '' }
@@ -439,5 +442,114 @@ assert.strictEqual(generateOffsetBoardResolutionDoc({ bylawArticle: '十七' }).
 });
 assert.strictEqual(APP_CONFIG.ENABLED_DOC_TYPES[0], 'payment_order'); // 預設仍為支付命令
 console.log('  ✅ 第二批功能測試通過');
+
+// 12. 第三批：強制執行狀（單一書狀、依標的補第三人）與債權憑證變體
+console.log('\n12. 第三批功能：強制執行狀與債權憑證');
+
+// 12.1 最低生活費 1.2 倍：由地址判斷區域（台／臺皆可），金額與扣薪試算同一份標準
+assert.strictEqual(getMinLivingStandard('taichung').standard1_2, 19717);
+assert.strictEqual(getMinLivingStandard('taipei').standard1_2, 24893);
+assert.strictEqual(getMinLivingStandard('不存在'), null);
+assert.strictEqual(deriveLivingRegionFromAddress('台中市西區五權路 50 號'), 'taichung');
+assert.strictEqual(deriveLivingRegionFromAddress('臺北市大安區'), 'taipei');
+assert.strictEqual(deriveLivingRegionFromAddress('新北市板橋區'), 'new_taipei');
+assert.strictEqual(deriveLivingRegionFromAddress('高雄市左營區'), 'kaohsiung');
+assert.strictEqual(deriveLivingRegionFromAddress('金門縣金城鎮'), 'kinmen_lienchiang');
+assert.strictEqual(deriveLivingRegionFromAddress('彰化縣員林市'), 'taiwan_province');
+assert.strictEqual(deriveLivingRegionFromAddress('嘉義市東區'), 'taiwan_province');
+assert.strictEqual(deriveLivingRegionFromAddress(''), '');
+assert.strictEqual(deriveLivingRegionFromAddress('某某路 1 號'), '');
+
+const allTargets = {
+  bankDeposit: true, bankList: '合作金庫商業銀行臺中分行｜臺中市西區某路 1 號\n玉山銀行臺中分行',
+  postOffice: true, postRep: '郵政代理人', salary: true, employerName: '宏達企業社', employerAddress: '臺中市北區某路 2 號',
+  employerRep: '雇主代理人', salaryStartMonth: '2026-11', livingRegion: 'taichung', laborInsurance: true, insurance: true,
+  stock: true, stockRep: '集保代理人', movables: true, vehiclePlate: 'ABC-1234', taxData: false,
+  realEstate: true, realEstateList: '土地：臺中市西區某段 1 地號，權利範圍：全部'
+};
+const exec1 = generateExecutionDoc({ ...withGuarantor2, penaltyRatio: '20', titleCaseNo: '112 年度司促字第 123 號', targets: allTargets });
+
+// 12.2 聲請執行之事項（沿用附件結構）：債務、違約金、費用
+assert.strictEqual(exec1.includes('聲請執行之事項：\n一、債務人等應連帶給付債權人新臺幣貳拾萬元整（小寫：200,000 元），及自 民國 112 年 5 月 11 日 起至清償日止，按年息百分之 12 計算之利息，並按上開利息百分之 20 計算之違約金。'), true);
+assert.strictEqual(exec1.includes('三、執行程序費用由債務人等連帶負擔。'), true);
+
+// 12.3 第三人當事人：雇主、各銀行、中華郵政、集保；郵政與集保的法定代理人由使用者填，不內建
+assert.strictEqual(exec1.includes('第三人：宏達企業社\n設址：臺中市北區某路 2 號\n法定代理人：雇主代理人'), true);
+assert.strictEqual(exec1.includes('第三人：合作金庫商業銀行臺中分行\n設址：臺中市西區某路 1 號'), true);
+assert.strictEqual(exec1.includes('第三人：玉山銀行臺中分行'), true);
+assert.strictEqual(exec1.includes('第三人：中華郵政股份有限公司\n統一編號：3741302'), true);
+assert.strictEqual(exec1.includes('法定代理人：郵政代理人'), true);
+assert.strictEqual(exec1.includes('第三人：臺灣集中保管結算所股份有限公司\n統一編號：23474232'), true);
+assert.strictEqual(exec1.includes('游芳來') || exec1.includes('林修銘'), false);
+const execNoRep = generateExecutionDoc({ ...batch2, targets: { postOffice: true, stock: true } });
+assert.strictEqual((execNoRep.match(/法定代理人：○○○/g) || []).length, 2); // 未填的法定代理人以「○○○」待填
+assert.strictEqual(execNoRep.includes('第三人：宏達'), false);
+
+// 12.4 薪資：扣 1/3、按月移轉、保留 1.2 倍（金額自動帶入）、起扣月份
+assert.strictEqual(exec1.includes('債務人現服務於第三人宏達企業社處，每月領有薪資，請扣押債務人之薪水三分之一，並准將債務人對於第三人之債權自 115 年 11 月份 起按月移轉於債權人，以資清償。'), true);
+assert.strictEqual(exec1.includes('債權人同意保留債務人居住地每人每月最低生活費之 1.2 倍（即 19,717 元）供債務人維持生活'), true);
+assert.strictEqual(exec1.includes('債務人僅請求就「超過」該數額部分實施扣押'), true);
+const execSalaryBlank = generateExecutionDoc({ ...batch2, targets: { salary: true } });
+assert.strictEqual(execSalaryBlank.includes('自 ○○ 年 ○ 月份 起'), true);
+assert.strictEqual(execSalaryBlank.includes('（即 ○○○ 元）'), true); // 區域未知時不得猜金額
+assert.strictEqual(execSalaryBlank.includes('第三人○○○處'), true);
+
+// 12.5 各標的措辭
+assert.strictEqual(exec1.includes('請就債務人王小明存放於第三人合作金庫商業銀行臺中分行之存款，於債權人聲請執行之債權範圍內予以扣押。'), true);
+assert.strictEqual(exec1.includes('請惠允函詢第三人中華郵政股份有限公司覆明債務人持有存款之受託存款郵局資料後，准向查得之郵局執行債務人持有之存款。'), true);
+assert.strictEqual(exec1.includes('請准予以勞動部勞工保險局電子閘門網路資料查明債務人任職之投保單位'), true);
+assert.strictEqual(exec1.includes('行政院勞工委員會'), false); // 機關已更名
+assert.strictEqual(exec1.includes('函囑第三人臺灣集中保管結算所股份有限公司陳報債務人王小明應受保管之股票及有價證券名稱'), true);
+assert.strictEqual(exec1.includes('且囑令不得對債務人為清償，僅得對債權人清償'), true);
+assert.strictEqual(exec1.includes('請查封、拍賣債務人王小明所有於門牌號碼 臺中市西區五權路 50 號 內之動產，及債務人所有車牌號碼 ABC-1234 之車輛一輛。'), true);
+assert.strictEqual(exec1.includes('土地：臺中市西區某段 1 地號，權利範圍：全部') && exec1.includes('亦應一併查封'), true);
+assert.strictEqual(exec1.includes('最高法院 108 年度台抗大字第 897 號'), true);
+// 未指名銀行時，改為囑託銀行公會查調
+assert.strictEqual(generateExecutionDoc({ ...batch2, targets: { bankDeposit: true } }).includes('囑託【中華民國銀行商業同業公會全國聯合會】'), true);
+// 舊欄位 bankName 仍相容
+assert.strictEqual(generateExecutionDoc({ ...batch2, targets: { bankDeposit: true, bankName: '合作金庫' } }).includes('第三人：合作金庫'), true);
+
+// 12.6 證物：依所勾標的產生，編號與內文「詳證物」一致
+const exhibitSection = exec1.split('證物名稱及件數：\n')[1].split('\n\n')[0];
+assert.strictEqual(exhibitSection, [
+  '一、支付命令及確定證明書正本各一份。', '二、債務人國稅局所得（財產）清單影本一份。', '三、第三人公示查詢資料一份。',
+  '四、債務人戶籍謄本一份。', '五、債務人所有土地（建物）登記簿謄本一份。', '六、最高法院 108 年度台抗大字第 897 號民事大法庭裁定要旨一份。'
+].join('\n'));
+assert.strictEqual(exec1.includes('（詳證物五）'), true);
+assert.strictEqual(exec1.includes('執行規費繳納收據'), false);
+// 勾選國稅局查調時，債權人手上還沒有所得清單，不列為證物
+assert.strictEqual(generateExecutionDoc({ ...batch2, targets: { salary: true, taxData: true } }).includes('國稅局所得（財產）清單影本'), false);
+
+// 12.7 項目超過十項時序號仍正確（多家存款銀行）
+const manyBanks = Array.from({ length: 12 }, (_, i) => `銀行${i + 1}｜地址`).join('\n');
+const execMany = generateExecutionDoc({ ...batch2, targets: { bankDeposit: true, bankList: manyBanks } });
+assert.strictEqual(execMany.includes('undefined'), false);
+assert.strictEqual(execMany.includes('十二、請就債務人王小明存放於第三人銀行12之存款'), true);
+assert.deepStrictEqual(parseThirdPartiesText('甲銀行｜台北市\n\n乙銀行'), [
+  { name: '甲銀行', address: '台北市', rep: '' }, { name: '乙銀行', address: '', rep: '' }
+]);
+
+// 12.8 強執狀：債務人死亡，繼承人為債務人
+const execDeceased = generateExecutionDoc({ ...batch2, debtorDeceased: true, heirs: '王大明｜C111111111｜臺北市', targets: { bankDeposit: true } });
+assert.strictEqual(execDeceased.includes('債務人：王大明（即 王小明 之繼承人）'), true);
+assert.strictEqual(execDeceased.includes('應於繼承被繼承人 王小明 所得遺產範圍內連帶給付債權人'), true);
+assert.strictEqual(execDeceased.includes('家事事件公告網路查詢資料一份'), true);
+
+// 12.9 債權憑證：聲請原因（查無財產／已離職）、債務人死亡、核發與換發
+const renewBase = { ...batch2, caseYear: '113', caseWord: '司執', caseNo: '12345', caseSection: '忠', titleCaseNo: '110 年度司執字第 1 號' };
+const renewResigned = generateRenewCertificateDoc({ ...renewBase, titleType: 'cert', renewReason: 'resigned', resignedEmployer: '宏達企業社' });
+assert.strictEqual(renewResigned.includes('民事聲請換發債權憑證狀'), true);
+assert.strictEqual(renewResigned.includes('其原任職於第三人宏達企業社，業已離職，又目前查無其他可供強制執行之財產'), true);
+assert.strictEqual(renewResigned.includes('業經 鈞院核發 110 年度司執字第 1 號 債權憑證在案'), true);
+const renewDefault = generateRenewCertificateDoc({ ...renewBase, titleType: 'payment_order' });
+assert.strictEqual(renewDefault.includes('又目前查無可供強制執行之財產'), true);
+assert.strictEqual(renewDefault.includes('業已離職'), false);
+assert.strictEqual(renewDefault.includes('民事聲請核發債權憑證狀'), true);
+const renewDeceased = generateRenewCertificateDoc({ ...renewBase, titleType: 'payment_order', debtorDeceased: true, deceasedDate: '2024-01-10', heirs: '王大明｜C111111111｜臺北市' });
+assert.strictEqual(renewDeceased.includes('債務人：王大明（即 王小明 之繼承人）'), true);
+assert.strictEqual(renewDeceased.includes('惟原債務人 王小明 已於 民國 113 年 1 月 10 日 死亡，於其繼承人未為相關權利主張時（詳證物二）'), true);
+assert.strictEqual(renewDeceased.includes('二、家事事件公告網路查詢資料一份。'), true);
+assert.strictEqual(renewDefault.includes('（或'), false);
+console.log('  ✅ 第三批功能測試通過');
 
 console.log('\n🎉 所有全面升級單元測試全數驗證通過！');

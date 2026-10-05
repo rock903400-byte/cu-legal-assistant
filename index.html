@@ -468,7 +468,7 @@
                 </div>
               </div>
 
-              <!-- 強制執行專屬欄位 (標的勾選清單) -->
+              <!-- 強制執行專屬欄位 (標的勾選清單；勾選後顯示各標的所需的第三人與細部欄位) -->
               <div id="executionSpecificFields" style="display:none; margin-bottom:14px;">
                 <h3 style="font-size:0.98rem; font-weight:800; color:var(--navy-primary); margin-bottom:8px;">
                   🎯 聲請強制執行之標的及方法（勾選欲查扣項目）：
@@ -477,8 +477,32 @@
                   <label class="checkbox-card">
                     <input type="checkbox" id="targetBankDeposit" checked>
                     <div class="checkbox-label">
-                      <h4>🏦 查調與扣押金融存款</h4>
-                      <p>聲請法院囑託銀行公會扣押存款</p>
+                      <h4>🏦 扣押銀行存款</h4>
+                      <p>指名存款銀行；不知道時囑託銀行公會查調</p>
+                    </div>
+                  </label>
+
+                  <label class="checkbox-card">
+                    <input type="checkbox" id="targetPostOffice">
+                    <div class="checkbox-label">
+                      <h4>📮 函詢郵局存款</h4>
+                      <p>函詢中華郵政查出受託郵局後執行</p>
+                    </div>
+                  </label>
+
+                  <label class="checkbox-card">
+                    <input type="checkbox" id="targetSalary" checked>
+                    <div class="checkbox-label">
+                      <h4>💼 扣押每月 1/3 薪資</h4>
+                      <p>按月移轉，並保留 1.2 倍最低生活費</p>
+                    </div>
+                  </label>
+
+                  <label class="checkbox-card">
+                    <input type="checkbox" id="targetLaborInsurance">
+                    <div class="checkbox-label">
+                      <h4>🔎 查調勞保投保單位</h4>
+                      <p>雇主不明時，由勞保局電子閘門查出</p>
                     </div>
                   </label>
 
@@ -491,10 +515,18 @@
                   </label>
 
                   <label class="checkbox-card">
-                    <input type="checkbox" id="targetSalary" checked>
+                    <input type="checkbox" id="targetStock">
                     <div class="checkbox-label">
-                      <h4>💼 扣押每月 1/3 薪資</h4>
-                      <p>扣押任職單位之薪資及各項獎金</p>
+                      <h4>📈 扣押股票</h4>
+                      <p>函囑集保陳報後扣押拍賣</p>
+                    </div>
+                  </label>
+
+                  <label class="checkbox-card">
+                    <input type="checkbox" id="targetMovables">
+                    <div class="checkbox-label">
+                      <h4>🚗 查封動產與車輛</h4>
+                      <p>債務人住處之動產及車牌</p>
                     </div>
                   </label>
 
@@ -515,10 +547,100 @@
                   </label>
                 </div>
 
-                <div class="form-grid" style="margin-top:10px;">
+                <!-- 薪資：第三人（雇主） -->
+                <div id="targetSalaryFields" style="display:none; background:var(--navy-light); padding:14px; border-radius:8px; margin-top:10px;">
+                  <h4 style="font-size:0.92rem; font-weight:800; color:var(--navy-primary); margin-bottom:8px;">💼 薪資扣押：第三人（雇主）與起扣月份</h4>
+                  <div class="form-grid">
+                    <div class="form-group">
+                      <label for="targetEmployerName">雇主名稱（第三人）</label>
+                      <input type="text" id="targetEmployerName" class="form-control" placeholder="不知道雇主時，請改勾「查調勞保投保單位」">
+                    </div>
+                    <div class="form-group">
+                      <label for="targetEmployerRep">雇主法定代理人</label>
+                      <input type="text" id="targetEmployerRep" class="form-control" placeholder="請查全國商工行政入口網">
+                    </div>
+                    <div class="form-group col-span-full">
+                      <label for="targetEmployerAddress">雇主設址</label>
+                      <input type="text" id="targetEmployerAddress" class="form-control" placeholder="例：臺中市西區○○路 1 號">
+                    </div>
+                    <div class="form-group">
+                      <label for="targetSalaryStartMonth">起扣月份</label>
+                      <input type="month" id="targetSalaryStartMonth" class="form-control">
+                    </div>
+                    <div class="form-group">
+                      <label for="docLivingRegion">債務人居住地（保留 1.2 倍最低生活費）</label>
+                      <select id="docLivingRegion" class="form-control">
+                        <option value="">依債務人地址自動判斷</option>
+                        <option value="taipei">臺北市</option>
+                        <option value="new_taipei">新北市</option>
+                        <option value="taoyuan">桃園市</option>
+                        <option value="taichung">臺中市</option>
+                        <option value="tainan">臺南市</option>
+                        <option value="kaohsiung">高雄市</option>
+                        <option value="taiwan_province">臺灣省各縣市</option>
+                        <option value="kinmen_lienchiang">金門縣、連江縣</option>
+                      </select>
+                      <div class="field-tip-box">
+                        💡 書狀會寫入該區「最低生活費 × 1.2」的金額（與「扣薪試算」分頁同一份標準），不必再自己查表乘算。
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 銀行存款：第三人（存款銀行） -->
+                <div id="targetBankFields" style="display:none; background:var(--navy-light); padding:14px; border-radius:8px; margin-top:10px;">
+                  <h4 style="font-size:0.92rem; font-weight:800; color:var(--navy-primary); margin-bottom:8px;">🏦 銀行存款：第三人（存款銀行或分行）</h4>
                   <div class="form-group">
-                    <label for="targetEmployerName">債務人任職單位 (選填)</label>
-                    <input type="text" id="targetEmployerName" class="form-control" placeholder="若不知可留空，查稅籍清單後補陳">
+                    <label for="targetBankList">每行一家：名稱｜設址</label>
+                    <textarea id="targetBankList" class="form-control" rows="3" placeholder="例：合作金庫商業銀行臺中分行｜臺中市西區○○路 1 號&#10;不知道存款銀行時請留空，書狀會改為囑託銀行公會查調"></textarea>
+                  </div>
+                </div>
+
+                <!-- 郵局存款：第三人（中華郵政） -->
+                <div id="targetPostFields" style="display:none; background:var(--navy-light); padding:14px; border-radius:8px; margin-top:10px;">
+                  <h4 style="font-size:0.92rem; font-weight:800; color:var(--navy-primary); margin-bottom:8px;">📮 郵局存款：第三人（中華郵政股份有限公司）</h4>
+                  <div class="form-group">
+                    <label for="targetPostRep">中華郵政法定代理人</label>
+                    <input type="text" id="targetPostRep" class="form-control" placeholder="請查全國商工行政入口網確認現任者">
+                    <div class="field-tip-box">
+                      💡 名稱、設址、統一編號取自附件〈強執聲請狀-郵局存款〉；法定代理人會異動，請填現任者。
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 股票：第三人（集保） -->
+                <div id="targetStockFields" style="display:none; background:var(--navy-light); padding:14px; border-radius:8px; margin-top:10px;">
+                  <h4 style="font-size:0.92rem; font-weight:800; color:var(--navy-primary); margin-bottom:8px;">📈 股票：第三人（臺灣集中保管結算所股份有限公司）</h4>
+                  <div class="form-group">
+                    <label for="targetStockRep">集保結算所法定代理人</label>
+                    <input type="text" id="targetStockRep" class="form-control" placeholder="請查全國商工行政入口網確認現任者">
+                    <div class="field-tip-box">
+                      💡 名稱、設址、統一編號取自附件〈查封扣押股票狀〉；法定代理人會異動，請填現任者。
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 動產與車輛 -->
+                <div id="targetMovablesFields" style="display:none; background:var(--navy-light); padding:14px; border-radius:8px; margin-top:10px;">
+                  <h4 style="font-size:0.92rem; font-weight:800; color:var(--navy-primary); margin-bottom:8px;">🚗 動產與車輛</h4>
+                  <div class="form-grid">
+                    <div class="form-group">
+                      <label for="targetMovablesAddress">動產所在門牌</label>
+                      <input type="text" id="targetMovablesAddress" class="form-control" placeholder="留空＝債務人住居所">
+                    </div>
+                    <div class="form-group">
+                      <label for="targetVehiclePlate">車牌號碼（選填）</label>
+                      <input type="text" id="targetVehiclePlate" class="form-control" placeholder="例：ABC-1234">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 不動產 -->
+                <div id="targetRealEstateFields" style="display:none; background:var(--navy-light); padding:14px; border-radius:8px; margin-top:10px;">
+                  <h4 style="font-size:0.92rem; font-weight:800; color:var(--navy-primary); margin-bottom:8px;">🏠 不動產標示</h4>
+                  <div class="form-group">
+                    <label for="targetRealEstateList">每行一筆土地或建物</label>
+                    <textarea id="targetRealEstateList" class="form-control" rows="3" placeholder="例：土地：臺中市西區○○段○○小段○○地號，權利範圍：全部&#10;例：建物：臺中市西區○○段○○小段○○建號，權利範圍：全部"></textarea>
                   </div>
                 </div>
               </div>
@@ -544,6 +666,17 @@
                   <div class="form-group">
                     <label for="docCaseSection">股別</label>
                     <input type="text" id="docCaseSection" class="form-control" placeholder="例：忠">
+                  </div>
+                  <div class="form-group">
+                    <label for="docRenewReason">聲請原因</label>
+                    <select id="docRenewReason" class="form-control">
+                      <option value="no_property">目前查無可供強制執行之財產</option>
+                      <option value="resigned">債務人已離職，查無其他可供執行之財產</option>
+                    </select>
+                  </div>
+                  <div class="form-group" id="resignedEmployerGroup" style="display:none;">
+                    <label for="docResignedEmployer">債務人原任職單位</label>
+                    <input type="text" id="docResignedEmployer" class="form-control" placeholder="例：宏達企業社">
                   </div>
                 </div>
               </div>

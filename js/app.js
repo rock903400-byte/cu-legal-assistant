@@ -393,7 +393,10 @@ function initDocGenerator() {
     'docManualInterest', 'docManualPenalty', 'docCourt',
     'docShareAmount', 'docDividendAmount', 'docDocNo',
     'docDeceasedDate', 'docHouseholdOffice',
-    'targetBankDeposit', 'targetBankName', 'targetInsurance', 'targetSalary', 'targetEmployerName', 'targetTaxData', 'targetRealEstate',
+    'targetBankDeposit', 'targetBankList', 'targetPostOffice', 'targetPostRep', 'targetSalary', 'targetEmployerName',
+    'targetEmployerAddress', 'targetEmployerRep', 'targetSalaryStartMonth', 'docLivingRegion', 'targetLaborInsurance',
+    'targetInsurance', 'targetStock', 'targetStockRep', 'targetMovables', 'targetMovablesAddress', 'targetVehiclePlate',
+    'targetTaxData', 'targetRealEstate', 'targetRealEstateList', 'docRenewReason', 'docResignedEmployer',
     'docTitleType', 'docTitleCaseNo', 'docTitleCourt', 'docCaseYear', 'docCaseWord', 'docCaseNo', 'docCaseSection'
   ];
 
@@ -584,14 +587,17 @@ function updateDocTypeVisibility() {
 
   const isPayment = type === 'payment_order';
   const isFinal = type === 'payment_order_final';
+  const isExec = type === 'execution';
+  const isRenew = type === 'renew_cert';
   const isLetter = type === 'demand_letter' || type === 'offset_letter';
   const isInheritanceDoc = type === 'household_apply' || type === 'inheritance_inquiry' || type === 'inheritance_demand';
-  const deceased = (isPayment || isFinal) && checked('docDebtorDeceased');
+  const deceasedApplies = isPayment || isFinal || isExec || isRenew;
+  const deceased = deceasedApplies && checked('docDebtorDeceased');
 
-  show('executionSpecificFields', type === 'execution');
-  show('renewCertSpecificFields', type === 'renew_cert');
-  show('titleTypeWrap', type === 'execution' || type === 'renew_cert');
-  show('titleCaseNoWrap', type === 'execution' || isFinal);
+  show('executionSpecificFields', isExec);
+  show('renewCertSpecificFields', isRenew);
+  show('titleTypeWrap', isExec || isRenew);
+  show('titleCaseNoWrap', isExec || isFinal || isRenew);
   show('orderIssueWrap', isFinal);
   show('offsetSpecificFields', type === 'offset_share' || type === 'offset_board');
   show('letterSpecificFields', isLetter);
@@ -601,9 +607,20 @@ function updateDocTypeVisibility() {
   show('rateChangeWrap', isPayment && checked('docRateChanged'));
 
   // 債務人死亡：支付命令與確定證明書列繼承人；死亡日期僅支付命令需要
-  show('deceasedToggleGroup', isPayment || isFinal);
+  show('deceasedToggleGroup', deceasedApplies);
   show('heirsFieldsWrap', deceased);
-  show('deceasedSpecificFields', isInheritanceDoc || (isPayment && deceased));
+  show('deceasedSpecificFields', isInheritanceDoc || ((isPayment || isRenew) && deceased));
+
+  // 強制執行：勾選標的後才顯示該標的所需的第三人與細部欄位
+  show('targetSalaryFields', isExec && checked('targetSalary'));
+  show('targetBankFields', isExec && checked('targetBankDeposit'));
+  show('targetPostFields', isExec && checked('targetPostOffice'));
+  show('targetStockFields', isExec && checked('targetStock'));
+  show('targetMovablesFields', isExec && checked('targetMovables'));
+  show('targetRealEstateFields', isExec && checked('targetRealEstate'));
+
+  // 債權憑證：債務人已離職時才需填原任職單位
+  show('resignedEmployerGroup', isRenew && document.getElementById('docRenewReason')?.value === 'resigned');
   show('docHouseholdOfficeGroup', isInheritanceDoc);
   show('docAgentIdGroup', isInheritanceDoc);
 
@@ -687,14 +704,31 @@ function getDocFormData() {
     deceasedDateRoc: deceasedDateVal ? formatRocDate(deceasedDateVal).replace(/^民國\s*/, '') : '',
     householdOffice: text('docHouseholdOffice'),
 
+    renewReason: raw('docRenewReason') || 'no_property',
+    resignedEmployer: text('docResignedEmployer'),
+
     targets: {
       bankDeposit: document.getElementById('targetBankDeposit')?.checked ?? true,
-      bankName: text('targetBankName'),
+      bankList: raw('targetBankList'),
+      postOffice: document.getElementById('targetPostOffice')?.checked ?? false,
+      postRep: text('targetPostRep'),
       insurance: document.getElementById('targetInsurance')?.checked ?? true,
       salary: document.getElementById('targetSalary')?.checked ?? true,
       employerName: text('targetEmployerName'),
+      employerAddress: text('targetEmployerAddress'),
+      employerRep: text('targetEmployerRep'),
+      salaryStartMonth: raw('targetSalaryStartMonth'),
+      // 保留 1.2 倍最低生活費所依據的區域：未手動指定時，依債務人地址判斷
+      livingRegion: raw('docLivingRegion') || deriveLivingRegionFromAddress(text('docDebtorAddress')),
+      laborInsurance: document.getElementById('targetLaborInsurance')?.checked ?? false,
+      stock: document.getElementById('targetStock')?.checked ?? false,
+      stockRep: text('targetStockRep'),
+      movables: document.getElementById('targetMovables')?.checked ?? false,
+      movablesAddress: text('targetMovablesAddress'),
+      vehiclePlate: text('targetVehiclePlate'),
       taxData: document.getElementById('targetTaxData')?.checked ?? true,
-      realEstate: document.getElementById('targetRealEstate')?.checked ?? false
+      realEstate: document.getElementById('targetRealEstate')?.checked ?? false,
+      realEstateList: raw('targetRealEstateList')
     },
 
     titleType: raw('docTitleType') || 'payment_order',
