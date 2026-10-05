@@ -109,7 +109,8 @@ function foldIcsLines(content) {
 const STORAGE_KEYS = {
   RECORDS: 'cu_legal_records_v1',
   PROFILE: 'cu_profile_info_v1',
-  DRAFT_DOC: 'cu_draft_doc_form_v1',
+  // v2：舊版草稿混有「張大同」等預設假資料，不沿用
+  DRAFT_DOC: 'cu_draft_doc_form_v2',
   DRAFT_SCRIPT: 'cu_draft_script_form_v1',
   DRAFT_SALARY: 'cu_draft_salary_form_v1'
 };
@@ -238,16 +239,9 @@ function loadCuProfile() {
   try {
     if (typeof localStorage === 'undefined') return {};
     const raw = localStorage.getItem(STORAGE_KEYS.PROFILE);
-    if (!raw) {
-      return {
-        cuName: '有限責任臺中市第一儲蓄互助社',
-        cuTaxId: '04123456',
-        cuRep: '陳理事長',
-        cuAddress: '臺中市西區民生路 100 號',
-        cuPhone: '04-22223333',
-        agentName: '李專職'
-      };
-    }
+    // 尚未儲存本社資料時回傳空白，書狀上以「○」標示待填；
+    // 不可預設成示範用的假社名與統編，否則漏設定就會印出別家社的資料。
+    if (!raw) return {};
     return JSON.parse(raw);
   } catch (e) {
     return {};
@@ -321,6 +315,48 @@ ${events}END:VCALENDAR`;
 }
 
 /**
+ * 存證信函催告後 6 個月起訴期限（民法第 130 條）行事曆鬧鐘 (.ics)
+ * @param {{debtorName:string, noticeDateStr:string, expiryDateStr:string}} info
+ */
+function generateNoticeDeadlineICS(info) {
+  const nowStr = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const name = icsText(info.debtorName) || '未填';
+  const expiryCompact = String(info.expiryDateStr || '').replace(/-/g, '');
+  const noticeDate = icsText(info.noticeDateStr);
+  const uidSeed = `${expiryCompact}-${String(info.debtorName || '').length}-${String(info.noticeDateStr || '').replace(/-/g, '')}`;
+
+  const raw = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//CULROC//Credit Union Legal Assistant Notice Deadline//ZH
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:儲蓄互助社 存證信函催告 6 個月起訴期限
+X-WR-TIMEZONE:Asia/Taipei
+BEGIN:VEVENT
+UID:cu-notice-${uidSeed}@creditunion.local
+DTSTAMP:${nowStr}
+DTSTART;VALUE=DATE:${expiryCompact}
+DTEND;VALUE=DATE:${expiryCompact}
+SUMMARY:【催告 6 個月起訴期限】${name}
+DESCRIPTION:債務人：${name}\\n存證信函送達日：${noticeDate}\\n\\n⚠️ 民法第 130 條：催告後 6 個月內未起訴（含聲請支付命令），時效視為不中斷。今日為期限最後一日，請確認已向法院聲請支付命令或起訴。
+STATUS:CONFIRMED
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:【1 個月前提醒】對 ${name} 之催告將於 30 天後屆滿 6 個月，請準備聲請支付命令！
+TRIGGER:-P30D
+END:VALARM
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:【1 週前最後警告】對 ${name} 之催告 6 個月起訴期限剩 7 天，請立即具狀聲請支付命令！
+TRIGGER:-P7D
+END:VALARM
+END:VEVENT
+END:VCALENDAR`;
+
+  return foldIcsLines(raw);
+}
+
+/**
  * 觸發下載檔案
  */
 function downloadFile(filename, content, mimeType) {
@@ -336,15 +372,25 @@ function downloadFile(filename, content, mimeType) {
   URL.revokeObjectURL(url);
 }
 
+/** 純文字轉成可安全放進 HTML 的文字（& < >） */
+function escapeHtmlText(value) {
+  return String(value === null || value === undefined ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 /**
- * 匯出 Word (.doc) 格式檔案 (標準標楷體、A4直式橫書、段落縮排)
+ * 產生 Word (.doc) 內容 (標準標楷體、A4直式橫書、段落縮排)
+ * 書狀文字含使用者輸入（姓名、單位名稱），必須逸出：
+ * 未逸出時，名稱中的 < > 會被 Word 當成標籤吃掉，& 也可能造成內容殘缺。
  */
-function exportToWordDoc(filename, title, textContent) {
-  const formattedHtml = `
+function buildWordDocHtml(title, textContent) {
+  return `
     <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
     <head>
       <meta charset='utf-8'>
-      <title>${title}</title>
+      <title>${escapeHtmlText(title)}</title>
       <style>
         @page Section1 {
           size: 595.3pt 841.9pt; /* A4 */
@@ -381,13 +427,18 @@ function exportToWordDoc(filename, title, textContent) {
     </head>
     <body>
       <div class="Section1">
-        <pre>${textContent}</pre>
+        <pre>${escapeHtmlText(textContent)}</pre>
       </div>
     </body>
     </html>
   `;
+}
 
-  downloadFile(`${filename}.doc`, formattedHtml, 'application/msword;charset=utf-8');
+/**
+ * 匯出 Word (.doc) 格式檔案
+ */
+function exportToWordDoc(filename, title, textContent) {
+  downloadFile(`${filename}.doc`, buildWordDocHtml(title, textContent), 'application/msword;charset=utf-8');
 }
 
 /**
@@ -464,7 +515,10 @@ if (typeof module !== 'undefined' && module.exports) {
     loadCuProfile,
     saveCuProfile,
     generateICSContent,
+    generateNoticeDeadlineICS,
     exportToWordDoc,
+    buildWordDocHtml,
+    escapeHtmlText,
     exportRecordsToCSV,
     exportRecordsToJSON,
     importRecordsFromJSON,

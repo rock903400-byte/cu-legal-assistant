@@ -83,9 +83,38 @@ function calculateSalaryGarnishment(params) {
   };
 }
 
+/**
+ * 取得某區域「最低生活費 × 1.2」基準，供強制執行聲請狀薪資條款自動帶入
+ * @returns {{name:string, base:number, standard1_2:number}|null}
+ */
+function getMinLivingStandard(regionCode) {
+  const info = MIN_LIVING_EXPENSES_115[regionCode];
+  if (!info) return null;
+  return { name: info.name, base: info.amount, standard1_2: Math.round(info.amount * 1.2) };
+}
+
+/**
+ * 由債務人地址判斷最低生活費適用區域；判斷不出時回傳空字串
+ * 「台」「臺」皆可；除六都與金門、連江外，其餘縣市皆屬臺灣省各縣市
+ */
+function deriveLivingRegionFromAddress(address) {
+  const a = String(address || '').replace(/台/g, '臺');
+  if (a.includes('臺北市')) return 'taipei';
+  if (a.includes('新北市')) return 'new_taipei';
+  if (a.includes('桃園市')) return 'taoyuan';
+  if (a.includes('臺中市')) return 'taichung';
+  if (a.includes('臺南市')) return 'tainan';
+  if (a.includes('高雄市')) return 'kaohsiung';
+  if (a.includes('金門縣') || a.includes('連江縣')) return 'kinmen_lienchiang';
+  if (/[縣市]/.test(a)) return 'taiwan_province';
+  return '';
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     MIN_LIVING_EXPENSES_115,
-    calculateSalaryGarnishment
+    calculateSalaryGarnishment,
+    getMinLivingStandard,
+    deriveLivingRegionFromAddress
   };
 }

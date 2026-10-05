@@ -28,23 +28,30 @@ const TAIWAN_COURTS = [
 
 /**
  * 依地址關鍵字推薦法院
+ * - 一律先把「台」正規化為「臺」：法院與行政區資料都以「臺」建檔，
+ *   而實務上常見輸入「台中市」「台南市」，不正規化會比對不到。
+ * - 查無對應時回傳 null，由呼叫端保留使用者原本的選擇。
+ *   （舊版此處預設回傳臺北，會在使用者輸入到一半、或手動選好法院後，
+ *     被默默改成臺北地院。）
  */
 function findCourtByAddress(address) {
-  if (!address) return TAIWAN_COURTS[0];
+  const addr = String(address || '').replace(/台/g, '臺');
+  if (!addr) return null;
+
   for (const court of TAIWAN_COURTS) {
     for (const area of court.areas) {
-      if (address.includes(area)) {
+      if (addr.includes(area)) {
         return court;
       }
     }
   }
   // 依縣市比對
   for (const court of TAIWAN_COURTS) {
-    if (address.includes(court.name)) {
+    if (addr.includes(court.name)) {
       return court;
     }
   }
-  return TAIWAN_COURTS[0]; // 預設台北
+  return null;
 }
 
 if (typeof module !== 'undefined' && module.exports) {

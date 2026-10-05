@@ -49,7 +49,6 @@ const testDocData = {
   creditorAddress: '臺中市西區民生路 100 號',
   creditorPhone: '04-22223333',
   agentName: '李專職',
-  agentId: 'B221133445',
   debtorName: '張大同',
   debtorId: 'B123456789',
   debtorAddress: '臺中市西區五權路 50 號',
@@ -71,8 +70,6 @@ const testDocData = {
   dividendAmount: 2500,
   docNo: '中一互社催字第 115001 號',
   deceasedDate: '2024-01-10',
-  deceasedDateRoc: '113 年 1 月 10 日',
-  householdOffice: '臺中市西區戶政事務所',
   targets: {
     bankDeposit: true,
     bankName: '合作金庫',
@@ -87,7 +84,11 @@ const testDocData = {
   caseYear: '112',
   caseWord: '司執',
   caseNo: '98765',
-  caseSection: '民'
+  caseSection: '民',
+  bylawArticle: '十七',
+  extraParties: '',
+  orderIssueDate: '2023-08-15',
+  noticeDate: '2026-10-05'
 };
 
 const doc1 = generatePaymentOrderDoc(testDocData);
@@ -96,23 +97,31 @@ assert(doc1.includes('民事支付命令聲請狀') && doc1.includes('張大同'
 const doc2 = generateExecutionDoc(testDocData);
 assert(doc2.includes('民事強制執行聲請狀') && doc2.includes('最高法院 108 年度台抗大字第 897 號') && doc2.includes('保單價值準備金'), '2. 強制執行狀正確包含人身保險大法庭裁定與存款扣押');
 
-const doc3 = generateRenewCertificateDoc(testDocData);
-assert(doc3.includes('民事聲請換發債權憑證狀') && doc3.includes('強制執行法第 27 條'), '3. 換發債權憑證狀法規與案號符合規範');
+// 強制執行狀：e2e 資料含單一指名銀行（舊欄位 bankName）與雇主，須列為第三人
+assert(doc2.includes('第三人：合作金庫') && doc2.includes('第三人：宏達企業社') && doc2.includes('聲請執行之事項'), '2-2. 強制執行狀列出第三人（銀行、雇主）與聲請執行之事項');
+
+const doc3 = generateRenewCertificateDoc({ ...testDocData, titleType: 'cert' });
+assert(doc3.includes('民事聲請換發債權憑證狀') && doc3.includes('強制執行法第 27 條') && doc3.includes('債權憑證正本一份'), '3. 換發債權憑證狀（執行名義為債權憑證）法規、案號與證物符合規範');
+const doc3b = generateRenewCertificateDoc({ ...testDocData, titleType: 'payment_order' });
+assert(doc3b.includes('民事聲請核發債權憑證狀') && doc3b.includes('支付命令及確定證明書正本各一份'), '3-2. 執行名義為支付命令時，債權憑證狀為首次「核發」');
 
 const doc4 = generateOffsetShareDoc(testDocData);
-assert(doc4.includes('儲蓄互助社法》第 14 條') && doc4.includes('抵銷權') && doc4.includes('50,000'), '4. 股金抵銷通知書正確引用儲互社法第 14 條與股金金額');
+assert(doc4.includes('本社章程第 十七 條') && !doc4.includes('儲蓄互助社法') && doc4.includes('抵銷權') && doc4.includes('50,000'), '4. 股金抵銷通知書依本社章程條次辦理（不誤引儲蓄互助社法第 14 條）並帶入股金金額');
 
 const doc5 = generateOffsetBoardResolutionDoc(testDocData);
 assert(doc5.includes('理事會審議') && doc5.includes('行使股金抵銷權案') && doc5.includes('210,000'), '5. 理事會股金抵銷簽呈格式完整');
 
-const doc6 = generateHouseholdApplyDoc(testDocData);
-assert(doc6.includes('戶籍謄本申請書') && doc6.includes('繼承人') && doc6.includes('戶籍法第 65 條'), '6. 戶政事務所除戶與繼承人謄本申請書正確');
+// 未設定本社資料時不得回傳示範用的假社名／統編
+assert(Object.keys(loadCuProfile()).length === 0, '尚未儲存本社資料時，loadCuProfile 回傳空白而非示範假資料');
 
-const doc7 = generateInheritanceInquiryDoc(testDocData);
-assert(doc7.includes('家事法庭') && doc7.includes('拋棄繼承') && doc7.includes('限定繼承'), '7. 家事法庭拋棄繼承查詢狀正確');
+const doc9 = generateDemandLetterDoc(testDocData);
+assert(doc9.includes('郵局存證信函') && doc9.includes('函到七日內至本社處理') && doc9.includes('三、副本收件人') && doc9.includes('李小華'), '6. 存證信函（清償債務催告）沿用附件原文並列副本收件人');
 
-const doc8 = generateInheritanceDemandDoc(testDocData);
-assert(doc8.includes('全體法定繼承人') && doc8.includes('民法》第 1148 條') && doc8.includes('210,000'), '8. 致全體繼承人催告函正確引用民法第 1148 條');
+const doc10 = generateOffsetLetterDoc(testDocData);
+assert(doc10.includes('依本社章程十七條') && doc10.includes('已於執行階段'), '7. 存證信函（股金扣除貸款）引用本社章程十七條');
+
+const doc11 = generatePaymentOrderFinalDoc(testDocData);
+assert(doc11.includes('民事聲請支付命令確定證明書狀') && doc11.includes('112 年度司促字第 12345 號') && doc11.includes('民事訴訟法第 521 條'), '8. 支付命令確定證明書狀帶入案號與法條');
 
 // 2. 驗證 115 年度全台扣薪試算與極值防呆
 console.log('\n【模組二：115 年度全台最低生活費扣薪計算機驗證】');
@@ -168,5 +177,7 @@ assert(phoneScripts.empathy.script.includes('林美華') && phoneScripts.empathy
 assert(lineMsgs.gentle.text.includes('臺中第一互助社') && lineMsgs.gentle.text.includes('24,000'), 'LINE 催繳文案社名與金額正確帶入');
 
 console.log(`\n==================================================`);
-console.log(`🎉 全端深度邏輯驗證全部完成：通過 ${passedCount} / ${totalCount} 項測試（100% 通過）！`);
+console.log(passedCount === totalCount
+  ? `🎉 全端深度邏輯驗證全部完成：通過 ${passedCount} / ${totalCount} 項測試（100% 通過）！`
+  : `❌ 全端深度邏輯驗證未全數通過：${passedCount} / ${totalCount} 項通過，請檢視上方 FAIL 項目。`);
 console.log(`==================================================\n`);
