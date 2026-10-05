@@ -1,6 +1,6 @@
 /**
  * 主控制器邏輯 (app.js) - 全面升級版 (專職減負 Wizard、情境導航、白話小抄與 A4 擬真)
- * 整合：4 大情境入口、三步驟摺疊導引、司法院訴狀、股金抵銷、身故繼承、扣薪計算機、時效 KPI 看板、Word 匯出與草稿自動暫存
+ * 整合：4 大情境入口、三步驟摺疊導引、司法院訴狀、股金抵銷、存證信函、扣薪計算機、時效 KPI 看板、Word 匯出與草稿自動暫存
  */
 
 // 儲存原始純文字供複製與下載
@@ -384,7 +384,7 @@ function updateScriptsPreview() {
    ========================================================================== */
 function initDocGenerator() {
   const formInputs = [
-    'docType', 'docCreditorName', 'docCreditorTaxId', 'docCreditorRep', 'docCreditorAddress', 'docCreditorPhone', 'docAgentName', 'docAgentId',
+    'docType', 'docCreditorName', 'docCreditorTaxId', 'docCreditorRep', 'docCreditorAddress', 'docCreditorPhone', 'docAgentName',
     'docDebtorName', 'docDebtorId', 'docDebtorAddress', 'docDebtorMemberNo',
     'docHasGuarantor', 'docGuarantorName', 'docGuarantorId', 'docGuarantorAddress', 'docExtraParties',
     'docDebtorDeceased', 'docHeirs', 'docBasisType', 'docPenaltyRatio', 'docPenaltyStartDate',
@@ -392,7 +392,7 @@ function initDocGenerator() {
     'docLoanDate', 'docLoanAmount', 'docPrincipal', 'docInterestRate', 'docLastPaymentDate', 'docInterestStartDate',
     'docManualInterest', 'docManualPenalty', 'docCourt',
     'docShareAmount', 'docDividendAmount', 'docDocNo',
-    'docDeceasedDate', 'docHouseholdOffice',
+    'docDeceasedDate',
     'targetBankDeposit', 'targetBankList', 'targetPostOffice', 'targetPostRep', 'targetSalary', 'targetEmployerName',
     'targetEmployerAddress', 'targetEmployerRep', 'targetSalaryStartMonth', 'docLivingRegion', 'targetLaborInsurance',
     'targetInsurance', 'targetStock', 'targetStockRep', 'targetMovables', 'targetMovablesAddress', 'targetVehiclePlate',
@@ -590,7 +590,6 @@ function updateDocTypeVisibility() {
   const isExec = type === 'execution';
   const isRenew = type === 'renew_cert';
   const isLetter = type === 'demand_letter' || type === 'offset_letter';
-  const isInheritanceDoc = type === 'household_apply' || type === 'inheritance_inquiry' || type === 'inheritance_demand';
   const deceasedApplies = isPayment || isFinal || isExec || isRenew;
   const deceased = deceasedApplies && checked('docDebtorDeceased');
 
@@ -609,7 +608,7 @@ function updateDocTypeVisibility() {
   // 債務人死亡：支付命令與確定證明書列繼承人；死亡日期僅支付命令需要
   show('deceasedToggleGroup', deceasedApplies);
   show('heirsFieldsWrap', deceased);
-  show('deceasedSpecificFields', isInheritanceDoc || ((isPayment || isRenew) && deceased));
+  show('deceasedSpecificFields', (isPayment || isRenew) && deceased);
 
   // 強制執行：勾選標的後才顯示該標的所需的第三人與細部欄位
   show('targetSalaryFields', isExec && checked('targetSalary'));
@@ -621,13 +620,10 @@ function updateDocTypeVisibility() {
 
   // 債權憑證：債務人已離職時才需填原任職單位
   show('resignedEmployerGroup', isRenew && document.getElementById('docRenewReason')?.value === 'resigned');
-  show('docHouseholdOfficeGroup', isInheritanceDoc);
-  show('docAgentIdGroup', isInheritanceDoc);
 
   // 存證信函、股金抵銷公文不送法院，不需管轄法院
-  const noCourt = ['offset_share', 'offset_board', 'household_apply', 'demand_letter', 'offset_letter'].includes(type);
+  const noCourt = ['offset_share', 'offset_board', 'demand_letter', 'offset_letter'].includes(type);
   show('courtSelectGroup', !noCourt, 'flex');
-  show('guarantorCheckboxGroup', !(type === 'household_apply' || type === 'inheritance_inquiry'));
 
   // 僅支付命令沿用「已就緒」提示，其餘公文各有專屬欄位區
   show('generalDocHint', isPayment);
@@ -659,7 +655,6 @@ function getDocFormData() {
     creditorAddress: (profile.cuAddress || '').trim(),
     creditorPhone: (profile.cuPhone || '').trim(),
     agentName: (profile.agentName || '').trim(),
-    agentId: text('docAgentId'),
     bylawArticle: (profile.cuBylawArticle || '').trim(),
 
     debtorName: text('docDebtorName'),
@@ -700,9 +695,6 @@ function getDocFormData() {
     docNo: text('docDocNo'),
 
     deceasedDate: deceasedDateVal,
-    // 範本在前面已寫「民國」，這裡的值不可再帶「民國」前綴
-    deceasedDateRoc: deceasedDateVal ? formatRocDate(deceasedDateVal).replace(/^民國\s*/, '') : '',
-    householdOffice: text('docHouseholdOffice'),
 
     renewReason: raw('docRenewReason') || 'no_property',
     resignedEmployer: text('docResignedEmployer'),
@@ -769,15 +761,6 @@ function updateDocPreview() {
       break;
     case 'offset_board':
       text = generateOffsetBoardResolutionDoc(data);
-      break;
-    case 'household_apply':
-      text = generateHouseholdApplyDoc(data);
-      break;
-    case 'inheritance_inquiry':
-      text = generateInheritanceInquiryDoc(data);
-      break;
-    case 'inheritance_demand':
-      text = generateInheritanceDemandDoc(data);
       break;
     default:
       text = generatePaymentOrderDoc(data);
@@ -1347,7 +1330,6 @@ function initDemoDataButton() {
     // 案號類欄位已不再預填（避免假資料混入真實書狀），示範時由此帶入
     // （本社資料來自「本社資料設定」，示範不改動，以免覆蓋使用者已儲存的設定）
     const demoFields = {
-      docAgentId: 'B221133445',
       docInterestStartDate: '',
       docTitleCaseNo: '112 年度司促字第 12345 號',
       docCaseYear: '112',
@@ -1355,8 +1337,7 @@ function initDemoDataButton() {
       docCaseNo: '98765',
       docCaseSection: '民',
       docDocNo: '中一互社催字第 115001 號',
-      docDeceasedDate: '2024-01-10',
-      docHouseholdOffice: '臺中市西區戶政事務所'
+      docDeceasedDate: '2024-01-10'
     };
     Object.entries(demoFields).forEach(([id, v]) => {
       const el = document.getElementById(id);

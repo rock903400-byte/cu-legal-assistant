@@ -6,12 +6,9 @@
  * 3. 民事聲請核發／換發債權憑證狀 (依執行名義種類決定)
  * 4. 社員逾期放款以留存股金及股息抵銷借款通知書 (依本社章程)
  * 5. 理監事會審議逾期放款行使股金抵銷權簽呈
- * 6. 向戶政事務所申請除戶戶籍謄本及繼承人戶籍申請書 (社員身故)
- * 7. 民事聲請查詢拋棄繼承或限定繼承狀 (法院家事法庭)
- * 8. 致全體繼承人履行遺產債務催告函
- * 9. 郵局存證信函（清償債務催告）
- * 10. 郵局存證信函（股金扣除貸款）
- * 11. 民事聲請支付命令確定證明書狀
+ * 6. 郵局存證信函（清償債務催告）
+ * 7. 郵局存證信函（股金扣除貸款）
+ * 1-2. 民事聲請支付命令確定證明書狀
  */
 
 // 相容 Node.js 與瀏覽器環境
@@ -736,118 +733,7 @@ function generateOffsetBoardResolutionDoc(data) {
 }
 
 /**
- * 6. 產生《向戶政事務所申請除戶戶籍謄本及繼承人戶籍申請書》 (社員身故)
- */
-function generateHouseholdApplyDoc(data) {
-  const roc = getRocDateHelper();
-  return `戶籍謄本申請書（利害關係人債權保全專用）
-受文機關：${data.householdOffice || '○○市○○區戶政事務所'}
-申請日期：中華民國 ${roc.rocYear} 年 ${roc.month} 月 ${roc.day} 日
-
-申請人（債權人）：${data.creditorName || '有限責任○○儲蓄互助社'}
-統一編號：${data.creditorTaxId || ''}
-法定代理人：${data.creditorRep || ''}
-設址：${data.creditorAddress || ''}
-聯絡電話：${data.creditorPhone || ''}
-受任人（經辦專職）：${data.agentName || '○○○'}，身分證字號：${data.agentId || '○○○○○○○○○○'}
-
-被申請人（即亡故債務人）：
-姓名：${data.debtorName || '○○○'}
-身分證統一編號：${data.debtorId || ''}
-最後戶籍地址：${data.debtorAddress || ''}
-
-申請事由與利害關係證明：
-一、緣被申請人 ${data.debtorName || '○○○'} 前向申請人借款${toChineseCurrencyHelper(data.principal || 0)}未清償，詎其已於民國 ${data.deceasedDateRoc || '○○ 年 ○ 月 ○ 日'} 亡故。
-二、申請人為行使合法債權並依法向其全體法定繼承人行使追索權，特依戶籍法第 65 條第 1 項及民法第 1148 條規定，檢附借據正本（或執行名義）及公文，申請核發被申請人之【除戶全戶戶籍謄本（含記事欄全）】及【全體第一順位繼承人之最新現戶戶籍謄本】各一份，以維權益。
-
-檢附利害關係證明文件：
-一、借款申請書兼借據影本一份。
-二、放款明細表暨欠款計算書一份。
-三、儲蓄互助社法人登記證書影本及法定代理人委任書一份。
-
-此致
-${data.householdOffice || '○○市○○區戶政事務所'}
-
-申請人：${data.creditorName || '有限責任○○儲蓄互助社'}  [ 蓋社圖記 (大章) ]
-法定代理人：${data.creditorRep || ''}  [ 理事長簽章 (小章) ]
-受任人：${data.agentName || '○○○'} （簽章）
-`;
-}
-
-/**
- * 7. 產生《民事聲請查詢拋棄繼承或限定繼承狀》 (法院家事法庭)
- */
-function generateInheritanceInquiryDoc(data) {
-  const roc = getRocDateHelper();
-  return `民事聲請查詢拋棄繼承或陳報遺產清冊狀
-聲請人（即債權人）：${data.creditorName || '有限責任○○儲蓄互助社'}
-統一編號：${data.creditorTaxId || ''}
-法定代理人：${data.creditorRep || ''}
-設址：${data.creditorAddress || ''}
-電話：${data.creditorPhone || ''}
-
-被繼承人（即亡故債務人）：${data.debtorName || '○○○'}
-身分證統一編號：${data.debtorId || ''}
-生前最後住所：${data.debtorAddress || ''}
-死亡日期：民國 ${data.deceasedDateRoc || '○○ 年 ○ 月 ○ 日'}
-
-為聲請查詢繼承事件事：
-
-聲請意旨：
-一、緣被繼承人 ${data.debtorName || '○○○'} 生前向聲請人借款尚有${toChineseCurrencyHelper(data.principal || 0)}（${Number(data.principal || 0).toLocaleString()}元）及利息未償。
-二、查被繼承人業於民國 ${data.deceasedDateRoc || '○○ 年 ○ 月 ○ 日'} 亡故，聲請人為依法向其法定繼承人主張債權，特檢附借據及除戶謄本，狀請 鈞院家事法庭准予函覆查詢：
-    1. 被繼承人是否有繼承人向 鈞院聲請「拋棄繼承」？其聲請人姓名、案號及准予備查日期？
-    2. 是否有繼承人向 鈞院陳報「限定繼承遺產清冊」？
-三、懇請 鈞院惠予查覆，以憑辦理後續訴訟及強制執行程序，實感德便。
-
-證物名稱及件數：
-一、借據影本一份。
-二、被繼承人除戶戶籍謄本一份。
-三、聲請人家事訴訟利害關係證明文件一份。
-
-謹  狀
-臺灣 ${textOrBlankHelper(data.courtName)} 地方法院 家事法庭  公鑒
-
-中  華  民  國  ${roc.rocYear}  年  ${roc.month}  月  ${roc.day}  日
-
-具狀人（即聲請人）：${data.creditorName || '有限責任○○儲蓄互助社'}  [ 蓋社圖記 (大章) ]
-法定代理人：${data.creditorRep || ''}  [ 理事長簽章 (小章) ]
-`;
-}
-
-/**
- * 8. 產生《致全體繼承人履行遺產債務催告函》
- */
-function generateInheritanceDemandDoc(data) {
-  const roc = getRocDateHelper();
-  const principal = Number(data.principal) || 0;
-  return `【${data.creditorName || '有限責任○○儲蓄互助社'}】
-函件文號：${data.docNo || '互社放催字第 ○○○事 號'}
-發文日期：中華民國 ${roc.rocYear} 年 ${roc.month} 月 ${roc.day} 日
-受文者：被繼承人 ${data.debtorName || '○○○'} 之全體法定繼承人（如戶籍名冊）
-住址：${data.heirAddress || '各繼承人現戶住址'}
-
-主旨：催告台端等履行被繼承人 ${data.debtorName || '○○○'} 於本社之借款債務，請 查照並於文到 10 日內出面清償或協商。
-
-說明：
-一、緣被繼承人 ${data.debtorName || '○○○'}（身分證字號：${data.debtorId || ''}）生前於 ${rocDateOrBlankHelper(data.loanDate)} 向本社借款，迄今尚欠未償本金${toChineseCurrencyHelper(principal)}（${principal.toLocaleString()}元）及約定利息。
-二、被繼承人不幸亡故後，依《民法》第 1148 條及第 1153 條規定，繼承人自繼承開始時，除法律另有規定外，承受被繼承人財產上之一切權利、義務，並對被繼承人之債務負清償責任。
-三、為保全本社放款債權並維護全體社員資產安全，特此發函催告台端等繼承人。請於文到 10 日內，攜帶身分證件至本社辦理清償或洽談分期協商；若已向法院合法辦理拋棄繼承者，請檢附法院准予備查公文影本寄回本社以利銷案。
-四、若逾期未為處理且未合法拋棄繼承者，本社將依法向臺灣地方法院對全體繼承人聲請強制執行（就所得遺產範圍內扣押執行），屆時產生之法律程序費用將一併由繼承人負擔。
-
-此致
-被繼承人 ${data.debtorName || '○○○'} 之全體繼承人
-
-${data.creditorName || '有限責任○○儲蓄互助社'}  [ 蓋社圖記 (大章) ]
-法定代理人（理事長）：${data.creditorRep || ''}  [ 理事長簽章 (小章) ]
-社址：${data.creditorAddress || ''}
-電話：${data.creditorPhone || ''}
-`;
-}
-
-
-/**
- * 9. 郵局存證信函（清償債務催告）— 內容沿用附件〈存證信函（清償債務）〉原文
+ * 6. 郵局存證信函（清償債務催告）— 內容沿用附件〈存證信函（清償債務）〉原文
  * 寄件人／收件人／副本收件人依郵局存證信函用紙欄位；「內容：」以下為每格一字之正文
  */
 function postalLetterHeader(data, title) {
@@ -876,7 +762,7 @@ function generateDemandLetterDoc(data) {
 }
 
 /**
- * 10. 郵局存證信函（股金扣除貸款）— 內容沿用附件〈存證信函（股金扣除貸款）〉原文
+ * 7. 郵局存證信函（股金扣除貸款）— 內容沿用附件〈存證信函（股金扣除貸款）〉原文
  * 適用：已經法院訴訟、進入執行階段，社員仍有股金尚未扣除貸款
  */
 function generateOffsetLetterDoc(data) {
@@ -898,9 +784,6 @@ if (typeof module !== 'undefined' && module.exports) {
     generateExecutionDoc,
     generateRenewCertificateDoc,
     generateOffsetShareDoc,
-    generateOffsetBoardResolutionDoc,
-    generateHouseholdApplyDoc,
-    generateInheritanceInquiryDoc,
-    generateInheritanceDemandDoc
+    generateOffsetBoardResolutionDoc
   };
 }

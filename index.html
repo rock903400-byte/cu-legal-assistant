@@ -130,11 +130,6 @@
                       <option value="offset_share">7. 《社員逾期放款以留存股金及股息抵銷通知書》</option>
                       <option value="offset_board">8. 《理監事會審議逾期放款行使股金抵銷權簽呈》</option>
                     </optgroup>
-                    <optgroup label="【四、社員身故與繼承人查調催討】">
-                      <option value="household_apply">9. 《向戶政事務所申請除戶及繼承人戶籍謄本申請書》</option>
-                      <option value="inheritance_inquiry">10. 《民事聲請查詢拋棄繼承或限定繼承狀》（法院家事法庭）</option>
-                      <option value="inheritance_demand">11. 《致全體繼承人履行遺產債務催告函》</option>
-                    </optgroup>
                   </select>
                 </div>
 
@@ -386,23 +381,15 @@
                 </div>
               </div>
 
-              <!-- 身故與繼承專屬欄位 -->
+              <!-- 債務人死亡資料（支付命令、債權憑證用） -->
               <div id="deceasedSpecificFields" style="display:none; margin-bottom:14px;">
                 <h3 style="font-size:0.98rem; font-weight:800; color:var(--navy-primary); margin-bottom:8px;">
-                  ⚰️ 社員身故與繼承人查調專用欄位：
+                  ⚰️ 債務人死亡資料：
                 </h3>
                 <div class="form-grid">
                   <div class="form-group">
                     <label for="docDeceasedDate">借款人（被繼承人）死亡日期</label>
                     <input type="date" id="docDeceasedDate" class="form-control">
-                  </div>
-                  <div class="form-group" id="docHouseholdOfficeGroup">
-                    <label for="docHouseholdOffice">申請戶政事務所名稱</label>
-                    <input type="text" id="docHouseholdOffice" class="form-control" placeholder="例：臺中市西區戶政事務所">
-                  </div>
-                  <div class="form-group" id="docAgentIdGroup">
-                    <label for="docAgentId">經辦專職身分證字號 (戶籍申請用)</label>
-                    <input type="text" id="docAgentId" class="form-control" placeholder="例：B221133445">
                   </div>
                 </div>
               </div>

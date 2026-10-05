@@ -30,9 +30,6 @@ const {
   generateRenewCertificateDoc,
   generateOffsetShareDoc,
   generateOffsetBoardResolutionDoc,
-  generateHouseholdApplyDoc,
-  generateInheritanceInquiryDoc,
-  generateInheritanceDemandDoc,
   generatePaymentOrderFinalDoc,
   parseThirdPartiesText,
   generateDemandLetterDoc,
@@ -109,8 +106,8 @@ assert.strictEqual(salB.garnishableAmount, 0);
 assert.strictEqual(salB.warningMessage.includes('不得扣押'), true);
 console.log('  ✅ 薪資扣押計算與負數邊界防呆全部通過');
 
-// 5. 測試公文書狀生成 (含司法訴訟、股金抵銷、身故繼承等 8 大公文)
-console.log('\n5. 測試公文範本庫 (8 大公文)');
+// 5. 測試公文書狀生成 (司法訴訟與股金抵銷公文)
+console.log('\n5. 測試公文範本庫');
 
 // 5.1 支付命令
 const paymentOrderDoc = generatePaymentOrderDoc({
@@ -177,33 +174,7 @@ const boardDoc = generateOffsetBoardResolutionDoc({
 });
 assert.strictEqual(boardDoc.includes('行使股金抵銷權案'), true);
 
-// 5.6 戶政除戶申請
-const houseDoc = generateHouseholdApplyDoc({
-  creditorName: '有限責任臺中市第一儲蓄互助社',
-  debtorName: '張大同',
-  principal: 100000
-});
-assert.strictEqual(houseDoc.includes('戶籍謄本申請書'), true);
-
-// 5.7 拋棄繼承查詢狀 (家事庭)
-const inheritDoc = generateInheritanceInquiryDoc({
-  creditorName: '有限責任臺中市第一儲蓄互助社',
-  debtorName: '張大同',
-  courtName: '臺中'
-});
-assert.strictEqual(inheritDoc.includes('拋棄繼承'), true);
-assert.strictEqual(inheritDoc.includes('家事法庭'), true);
-
-// 5.8 繼承人催告函
-const demandDoc = generateInheritanceDemandDoc({
-  creditorName: '有限責任臺中市第一儲蓄互助社',
-  debtorName: '張大同',
-  principal: 100000
-});
-assert.strictEqual(demandDoc.includes('全體法定繼承人'), true);
-assert.strictEqual(demandDoc.includes('民法》第 1148 條'), true);
-
-console.log('  ✅ 8 大公文範本生成全部通過');
+console.log('  ✅ 公文範本生成全部通過');
 
 // 6. 測試 iCalendar (.ics) 鬧鐘
 console.log('\n6. 測試 iCalendar (.ics) 鬧鐘推播格式');
@@ -265,11 +236,11 @@ const fullData = {
   creditorName: '有限責任臺中市第一儲蓄互助社', debtorName: '王小明', principal: 200000, loanAmount: 300000,
   interestRate: 12, loanDate: '2022-01-10', lastPaymentDate: '2023-05-10', interestStartDate: '2023-05-11',
   manualInterest: 5000, manualPenalty: 1000, shareAmount: 60000, dividendAmount: 3000, courtName: '臺中',
-  deceasedDateRoc: '113 年 1 月 10 日', targets: { bankDeposit: true, insurance: true, salary: true, taxData: true }
+  targets: { bankDeposit: true, insurance: true, salary: true, taxData: true }
 };
 const allGenerators = {
   generatePaymentOrderDoc, generateExecutionDoc, generateRenewCertificateDoc, generateOffsetShareDoc,
-  generateOffsetBoardResolutionDoc, generateHouseholdApplyDoc, generateInheritanceInquiryDoc, generateInheritanceDemandDoc
+  generateOffsetBoardResolutionDoc, generatePaymentOrderFinalDoc, generateDemandLetterDoc, generateOffsetLetterDoc
 };
 // 10.1 toChineseCurrency 已含「新臺幣」，範本不得再加一次；「民國」亦同
 Object.entries(allGenerators).forEach(([name, gen]) => {
