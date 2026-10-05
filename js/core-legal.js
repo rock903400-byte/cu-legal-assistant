@@ -107,6 +107,33 @@ function formatLocalDate(dateObj) {
 }
 
 /**
+ * 郵局存證信函用紙排版試算：每格一字、每行 20 格、每頁 10 行（依附件〈存證信函〉用紙）
+ * 段落（換行）一律另起一行；半形空白不佔格，全形空白與標點各佔一格。
+ * 僅供估算頁數與逐行抄寫，實際頁數與存證費以郵局認定為準。
+ * @param {string} body 信函「內容」正文
+ */
+function calcPostalLetterLayout(body, charsPerLine = 20, linesPerPage = 10) {
+  const lines = [];
+  let charCount = 0;
+  String(body || '').split(/\r?\n/).forEach(paragraph => {
+    const chars = Array.from(paragraph.replace(/[ \t\r]/g, ''));
+    if (chars.length === 0) return;
+    charCount += chars.length;
+    for (let i = 0; i < chars.length; i += charsPerLine) {
+      lines.push(chars.slice(i, i + charsPerLine).join(''));
+    }
+  });
+  return {
+    charCount,
+    lineCount: lines.length,
+    pageCount: Math.max(1, Math.ceil(lines.length / linesPerPage)),
+    lines,
+    charsPerLine,
+    linesPerPage
+  };
+}
+
+/**
  * 日期字串（YYYY-MM-DD）加減天數，回傳本地時區的 YYYY-MM-DD；輸入無效時回傳空字串
  * 用於「利息自最後繳息日次日起算」
  */
@@ -297,6 +324,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getCurrentRocDate,
     formatLocalDate,
     addDaysToDateStr,
+    calcPostalLetterLayout,
     addMonthsWithEomAdjust
   };
 }

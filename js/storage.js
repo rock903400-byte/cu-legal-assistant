@@ -315,6 +315,48 @@ ${events}END:VCALENDAR`;
 }
 
 /**
+ * 存證信函催告後 6 個月起訴期限（民法第 130 條）行事曆鬧鐘 (.ics)
+ * @param {{debtorName:string, noticeDateStr:string, expiryDateStr:string}} info
+ */
+function generateNoticeDeadlineICS(info) {
+  const nowStr = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const name = icsText(info.debtorName) || '未填';
+  const expiryCompact = String(info.expiryDateStr || '').replace(/-/g, '');
+  const noticeDate = icsText(info.noticeDateStr);
+  const uidSeed = `${expiryCompact}-${String(info.debtorName || '').length}-${String(info.noticeDateStr || '').replace(/-/g, '')}`;
+
+  const raw = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//CULROC//Credit Union Legal Assistant Notice Deadline//ZH
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:儲蓄互助社 存證信函催告 6 個月起訴期限
+X-WR-TIMEZONE:Asia/Taipei
+BEGIN:VEVENT
+UID:cu-notice-${uidSeed}@creditunion.local
+DTSTAMP:${nowStr}
+DTSTART;VALUE=DATE:${expiryCompact}
+DTEND;VALUE=DATE:${expiryCompact}
+SUMMARY:【催告 6 個月起訴期限】${name}
+DESCRIPTION:債務人：${name}\\n存證信函送達日：${noticeDate}\\n\\n⚠️ 民法第 130 條：催告後 6 個月內未起訴（含聲請支付命令），時效視為不中斷。今日為期限最後一日，請確認已向法院聲請支付命令或起訴。
+STATUS:CONFIRMED
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:【1 個月前提醒】對 ${name} 之催告將於 30 天後屆滿 6 個月，請準備聲請支付命令！
+TRIGGER:-P30D
+END:VALARM
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:【1 週前最後警告】對 ${name} 之催告 6 個月起訴期限剩 7 天，請立即具狀聲請支付命令！
+TRIGGER:-P7D
+END:VALARM
+END:VEVENT
+END:VCALENDAR`;
+
+  return foldIcsLines(raw);
+}
+
+/**
  * 觸發下載檔案
  */
 function downloadFile(filename, content, mimeType) {
@@ -458,6 +500,7 @@ if (typeof module !== 'undefined' && module.exports) {
     loadCuProfile,
     saveCuProfile,
     generateICSContent,
+    generateNoticeDeadlineICS,
     exportToWordDoc,
     exportRecordsToCSV,
     exportRecordsToJSON,

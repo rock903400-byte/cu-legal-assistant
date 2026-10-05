@@ -87,7 +87,11 @@ const testDocData = {
   caseYear: '112',
   caseWord: '司執',
   caseNo: '98765',
-  caseSection: '民'
+  caseSection: '民',
+  bylawArticle: '十七',
+  extraParties: '',
+  orderIssueDate: '2023-08-15',
+  noticeDate: '2026-10-05'
 };
 
 const doc1 = generatePaymentOrderDoc(testDocData);
@@ -102,7 +106,7 @@ const doc3b = generateRenewCertificateDoc({ ...testDocData, titleType: 'payment_
 assert(doc3b.includes('民事聲請核發債權憑證狀') && doc3b.includes('支付命令及確定證明書正本各一份'), '3-2. 執行名義為支付命令時，債權憑證狀為首次「核發」');
 
 const doc4 = generateOffsetShareDoc(testDocData);
-assert(doc4.includes('儲蓄互助社法》第 14 條') && doc4.includes('抵銷權') && doc4.includes('50,000'), '4. 股金抵銷通知書正確引用儲互社法第 14 條與股金金額');
+assert(doc4.includes('本社章程第 十七 條') && !doc4.includes('儲蓄互助社法') && doc4.includes('抵銷權') && doc4.includes('50,000'), '4. 股金抵銷通知書依本社章程條次辦理（不誤引儲蓄互助社法第 14 條）並帶入股金金額');
 
 const doc5 = generateOffsetBoardResolutionDoc(testDocData);
 assert(doc5.includes('理事會審議') && doc5.includes('行使股金抵銷權案') && doc5.includes('210,000'), '5. 理事會股金抵銷簽呈格式完整');
@@ -118,6 +122,15 @@ assert(doc8.includes('全體法定繼承人') && doc8.includes('民法》第 114
 
 // 未設定本社資料時不得回傳示範用的假社名／統編
 assert(Object.keys(loadCuProfile()).length === 0, '尚未儲存本社資料時，loadCuProfile 回傳空白而非示範假資料');
+
+const doc9 = generateDemandLetterDoc(testDocData);
+assert(doc9.includes('郵局存證信函') && doc9.includes('函到七日內至本社處理') && doc9.includes('三、副本收件人') && doc9.includes('李小華'), '9. 存證信函（清償債務催告）沿用附件原文並列副本收件人');
+
+const doc10 = generateOffsetLetterDoc(testDocData);
+assert(doc10.includes('依本社章程十七條') && doc10.includes('已於執行階段'), '10. 存證信函（股金扣除貸款）引用本社章程十七條');
+
+const doc11 = generatePaymentOrderFinalDoc(testDocData);
+assert(doc11.includes('民事聲請支付命令確定證明書狀') && doc11.includes('112 年度司促字第 12345 號') && doc11.includes('民事訴訟法第 521 條'), '11. 支付命令確定證明書狀帶入案號與法條');
 
 // 2. 驗證 115 年度全台扣薪試算與極值防呆
 console.log('\n【模組二：115 年度全台最低生活費扣薪計算機驗證】');

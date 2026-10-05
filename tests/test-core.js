@@ -11,7 +11,8 @@ const {
   calculateEstimatedInterest,
   calculateCourtFees,
   formatRocDate,
-  addDaysToDateStr
+  addDaysToDateStr,
+  calcPostalLetterLayout
 } = require('../js/core-legal');
 
 const { findCourtByAddress } = require('../js/court-data');
@@ -29,10 +30,15 @@ const {
   generateOffsetBoardResolutionDoc,
   generateHouseholdApplyDoc,
   generateInheritanceInquiryDoc,
-  generateInheritanceDemandDoc
+  generateInheritanceDemandDoc,
+  generatePaymentOrderFinalDoc,
+  generateDemandLetterDoc,
+  generateOffsetLetterDoc,
+  parsePartiesText
 } = require('../js/templates');
 
-const { generateICSContent } = require('../js/storage');
+const { generateICSContent, generateNoticeDeadlineICS } = require('../js/storage');
+const { APP_CONFIG } = require('../js/config');
 
 console.log('🧪 開始執行儲互社法催助手全面單元測試...\n');
 
@@ -146,15 +152,17 @@ const issueDoc = generateRenewCertificateDoc({
 assert.strictEqual(issueDoc.includes('民事聲請核發債權憑證狀'), true);
 assert.strictEqual(issueDoc.includes('支付命令及確定證明書正本各一份'), true);
 
-// 5.4 股金抵銷通知書 (儲互社法第 14 條)
+// 5.4 股金抵銷通知書（依本社章程；《儲蓄互助社法》第 14 條是退股程序，不可引為抵銷依據）
 const offsetDoc = generateOffsetShareDoc({
   creditorName: '有限責任臺中市第一儲蓄互助社',
   debtorName: '張大同',
   principal: 100000,
   shareAmount: 60000,
-  dividendAmount: 3000
+  dividendAmount: 3000,
+  bylawArticle: '第十七條'
 });
-assert.strictEqual(offsetDoc.includes('儲蓄互助社法》第 14 條'), true);
+assert.strictEqual(offsetDoc.includes('本社章程第 十七 條'), true);
+assert.strictEqual(offsetDoc.includes('儲蓄互助社法'), false);
 assert.strictEqual(offsetDoc.includes('抵銷後剩餘欠款：新臺幣 37,000 元整'), true);
 
 // 5.5 股金抵銷簽呈
@@ -318,5 +326,118 @@ assert.strictEqual(findCourtByAddress('台北市大安區').name, '臺北');
 assert.strictEqual(findCourtByAddress('某某路 1 號'), null);
 assert.strictEqual(findCourtByAddress(''), null);
 console.log('  ✅ 書狀內容正確性迴歸測試通過');
+
+// 11. 第二批：存證信函、確定證明書、支付命令變體、股金抵銷
+console.log('\n11. 第二批功能：存證信函與書狀變體');
+
+const batch2 = {
+  creditorName: '有限責任臺中市第一儲蓄互助社', creditorRep: '陳理事長', creditorAddress: '臺中市西區民生路 100 號',
+  debtorName: '王小明', debtorId: 'B123456789', debtorAddress: '臺中市西區五權路 50 號',
+  principal: 200000, loanAmount: 300000, loanDate: '2022-01-10', lastPaymentDate: '2023-05-10', interestStartDate: '2023-05-11',
+  interestRate: '12', courtName: '臺中', manualInterest: 5000, manualPenalty: 1000, bylawArticle: '第十七條'
+};
+const withGuarantor2 = { ...batch2, hasGuarantor: true, guarantorName: '李小華', guarantorId: 'L223456789', guarantorAddress: '臺中市南屯區大墩路 80 號' };
+
+// 11.1 存證信函（清償債務催告）：內文須與附件原文一致
+const letter1 = generateDemandLetterDoc(withGuarantor2);
+assert.strictEqual(letter1.includes('敬啟者　台端於民國111年1月10日向本社借貸新台幣參拾萬元整，至今仍有本金新台幣貳拾萬元整及利息、違約金尚未清償，'), true);
+assert.strictEqual(letter1.includes('謹此函告　台端請於函到七日內至本社處理，否則將依法訴訟請求，事涉台端權益，請惠予配合為禱，以免訟累。'), true);
+assert.strictEqual(letter1.includes('三、副本收件人\n姓名：李小華'), true);
+assert.strictEqual(generateDemandLetterDoc(batch2).includes('副本收件人'), false);
+assert.strictEqual(generateDemandLetterDoc({}).includes('民國○○年○○月○○日'), true);
+
+// 11.2 存證信函（股金扣除貸款）：含章程條次，條次未填時以「○○」待填
+const letter2 = generateOffsetLetterDoc(batch2);
+assert.strictEqual(letter2.includes('經法院訴訟已於執行階段，目前仍有股金尚未扣除貸款，依本社章程十七條，將以股金扣除貸款後續行執行法催程序，謹此函告　台端若有異議請於函到七日內至本社處理'), true);
+assert.strictEqual(generateOffsetLetterDoc({ ...batch2, bylawArticle: '十七' }).includes('本社章程十七條'), true);
+assert.strictEqual(generateOffsetLetterDoc({ ...batch2, bylawArticle: '' }).includes('本社章程○○條'), true);
+assert.strictEqual(letter2.includes('儲蓄互助社法'), false);
+
+// 11.3 郵局用紙排版試算：每行 20 字、每頁 10 行，段落另起一行，半形空白不佔格
+const l200 = calcPostalLetterLayout('字'.repeat(200));
+assert.strictEqual(l200.lineCount, 10);
+assert.strictEqual(l200.pageCount, 1);
+assert.strictEqual(calcPostalLetterLayout('字'.repeat(201)).pageCount, 2);
+assert.strictEqual(calcPostalLetterLayout('一二三\n四五六').lineCount, 2);
+assert.strictEqual(calcPostalLetterLayout('一 二 三').charCount, 3);
+assert.strictEqual(calcPostalLetterLayout('敬啟者　台端').charCount, 6); // 全形空白佔一格
+assert.strictEqual(calcPostalLetterLayout('').pageCount, 1);
+
+// 11.4 催告 6 個月起訴期限鬧鐘
+const noticeIcs = generateNoticeDeadlineICS({ debtorName: '王,小明', noticeDateStr: '2026-10-05', expiryDateStr: '2027-04-05' });
+assert.strictEqual(noticeIcs.includes('DTSTART;VALUE=DATE:20270405'), true);
+assert.strictEqual(noticeIcs.includes('TRIGGER:-P30D') && noticeIcs.includes('TRIGGER:-P7D'), true);
+assert.strictEqual(noticeIcs.includes('王\\,小明'), true); // 逗號須逸出
+noticeIcs.split('\r\n').forEach(l => assert.strictEqual(Buffer.byteLength(l, 'utf8') <= 76, true));
+
+// 11.5 確定證明書狀
+const finalDoc = generatePaymentOrderFinalDoc({ ...withGuarantor2, titleCaseNo: '112 年度司促字第 123 號', orderIssueDate: '2023-08-15' });
+assert.strictEqual(finalDoc.includes('民事聲請支付命令確定證明書狀'), true);
+assert.strictEqual(finalDoc.includes('聲請人與王小明、李小華間因 112 年度司促字第 123 號 事件，經 貴院於 民國 112 年 8 月 15 日 核發支付命令，並已確定在案'), true);
+assert.strictEqual(finalDoc.includes('依民事訴訟法第 521 條、第 399 條第 1 項規定，聲請 貴院付與該支付命令確定證明書'), true);
+const finalDeceased = generatePaymentOrderFinalDoc({ ...batch2, debtorDeceased: true, heirs: '王大明｜C111111111｜臺北市\n王小華' });
+assert.strictEqual(finalDeceased.includes('聲請人與王大明、王小華間'), true);
+
+// 11.6 支付命令：稱謂、違約金比例
+const pay1 = generatePaymentOrderDoc({ ...withGuarantor2, penaltyRatio: '20' });
+assert.strictEqual(pay1.includes('債權人：') && pay1.includes('債務人（即連帶保證人）：李小華'), true);
+assert.strictEqual(pay1.includes('相對人') || pay1.includes('聲請人（即債權人）'), false);
+assert.strictEqual(pay1.includes('按年息百分之 12 計算之利息，並按上開利息百分之 20 計算之違約金。'), true);
+const pay1b = generatePaymentOrderDoc({ ...batch2, penaltyRatio: '20', penaltyStartDate: '2023-06-01' });
+assert.strictEqual(pay1b.includes('並自 民國 112 年 6 月 1 日 起至清償日止，按上開利息百分之 20 計算之違約金'), true);
+assert.strictEqual(generatePaymentOrderDoc(batch2).includes('上開利息百分之'), false); // 未填違約金比例就不寫
+assert.strictEqual(pay1.includes('500 元郵局匯票一紙'), true);
+
+// 11.7 支付命令：利率經理事會調整（證物編號須與內文引用一致）
+const pay2 = generatePaymentOrderDoc({ ...withGuarantor2, penaltyRatio: '10', rateChanged: true, origRate: '10', origPenaltyRatio: '10', rateChangeDate: '2022-09-01' });
+assert.strictEqual(pay2.includes('原借據約定借款利率為按年息百分之 10 計算之利息，並按上開利息百分之 10 計算之違約金，惟債權人理事會於 民國 111 年 9 月 1 日 決議調整借款利率為按年息百分之 12'), true);
+assert.strictEqual(pay2.includes('（見證物二）'), true);
+assert.strictEqual(pay2.includes('二、債權人利息、違約金變動理事會紀錄影本一份。'), true);
+assert.strictEqual(generatePaymentOrderDoc(batch2).includes('理事會'), false);
+
+// 11.8 支付命令：以切結書為憑
+const pay3 = generatePaymentOrderDoc({ ...withGuarantor2, basisType: 'affidavit' });
+assert.strictEqual(pay3.includes('與債權人簽立切結書，願分期按月償還'), true);
+assert.strictEqual(pay3.includes('還款切結書影本一份'), true);
+assert.strictEqual(pay3.includes('借款新臺幣'), false);
+
+// 11.9 支付命令：債務人死亡，繼承人於遺產範圍內連帶（附件〈支付命令（債務人死亡）〉）
+const pay4 = generatePaymentOrderDoc({ ...withGuarantor2, debtorDeceased: true, deceasedDate: '2024-01-10', heirs: '王大明｜C111111111｜臺北市大安區\n王小華｜D222222222｜新北市板橋區' });
+assert.strictEqual(pay4.includes('債務人：王大明（即 王小明 之繼承人）'), true);
+assert.strictEqual(pay4.includes('債務人 王大明、王小華 應於繼承被繼承人 王小明 所得遺產範圍內與債務人 李小華 連帶給付債權人'), true);
+assert.strictEqual(pay4.includes('命其於繼承所得遺產範圍內連帶清償'), true);
+assert.strictEqual(pay4.includes('已於 民國 113 年 1 月 10 日 死亡'), true);
+assert.strictEqual(pay4.includes('家事事件公告網路查詢資料一份'), true);
+// 證物順序：借據、匯票、家事公告；內文引用的證物編號須對得上
+assert.strictEqual(pay4.includes('詳證物三') && pay4.includes('三、家事事件公告網路查詢資料一份。'), true);
+// 沒有保證人時，繼承人之間仍為連帶
+const pay4b = generatePaymentOrderDoc({ ...batch2, debtorDeceased: true, heirs: '王大明' });
+assert.strictEqual(pay4b.includes('於繼承被繼承人 王小明 所得遺產範圍內連帶給付'), true);
+
+// 11.10 多位連帶保證人（欄位 + 其他保證人文字框）
+const pay5 = generatePaymentOrderDoc({ ...withGuarantor2, extraParties: '陳大文｜A123456789｜臺中市北區三民路 1 號' });
+assert.strictEqual(pay5.includes('債務人（即連帶保證人）：陳大文'), true);
+assert.strictEqual(pay5.includes('並有債務人 李小華、陳大文 為連帶保證人，依法應負連帶清償責任'), true);
+assert.strictEqual(generateExecutionDoc({ ...withGuarantor2, extraParties: '陳大文' }).includes('債務人（即連帶保證人）：陳大文'), true);
+assert.strictEqual(generateRenewCertificateDoc({ ...withGuarantor2, extraParties: '陳大文' }).includes('連帶保證人：陳大文'), true);
+assert.strictEqual(generatePaymentOrderDoc({ ...batch2, hasGuarantor: false, extraParties: '陳大文' }).includes('陳大文'), false); // 未勾選保證人不帶入
+assert.deepStrictEqual(parsePartiesText('甲｜A1｜台北\n\n乙, B2 ,新北\n丙'), [
+  { name: '甲', id: 'A1', address: '台北' }, { name: '乙', id: 'B2', address: '新北' }, { name: '丙', id: '', address: '' }
+]);
+
+// 11.11 股金抵銷簽呈：不得有假專職姓名、假逾期月數
+const boardBlank = generateOffsetBoardResolutionDoc({});
+assert.strictEqual(boardBlank.includes('李專職') || boardBlank.includes('陳理事長'), false);
+assert.strictEqual(boardBlank.includes('累計逾期已逾 ○ 個月'), true);
+assert.strictEqual(/累計逾期已逾 \d+ 個月/.test(generateOffsetBoardResolutionDoc({ lastPaymentDate: '2020-01-01' })), true);
+assert.strictEqual(generateOffsetBoardResolutionDoc({ bylawArticle: '十七' }).includes('本社章程第 十七 條'), true);
+assert.strictEqual(generateOffsetBoardResolutionDoc({ bylawArticle: '十七' }).includes('儲蓄互助社法'), false);
+
+// 11.12 設定：啟用清單涵蓋新公文，且每一種都有對應範本
+['demand_letter', 'offset_letter', 'payment_order_final', 'offset_share', 'offset_board'].forEach(t => {
+  assert.strictEqual(APP_CONFIG.ENABLED_DOC_TYPES.includes(t), true, `未啟用 ${t}`);
+});
+assert.strictEqual(APP_CONFIG.ENABLED_DOC_TYPES[0], 'payment_order'); // 預設仍為支付命令
+console.log('  ✅ 第二批功能測試通過');
 
 console.log('\n🎉 所有全面升級單元測試全數驗證通過！');

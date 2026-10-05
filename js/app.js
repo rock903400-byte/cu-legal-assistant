@@ -272,7 +272,8 @@ function initProfileSettings() {
         cuRep: document.getElementById('profileCuRep').value.trim(),
         cuAddress: document.getElementById('profileCuAddress').value.trim(),
         cuPhone: document.getElementById('profileCuPhone').value.trim(),
-        agentName: document.getElementById('profileAgentName').value.trim()
+        agentName: document.getElementById('profileAgentName').value.trim(),
+        cuBylawArticle: document.getElementById('profileBylawArticle')?.value.trim() || ''
       };
       if (!saveCuProfile(updatedProfile)) {
         showToast('⚠️ 儲存失敗：瀏覽器儲存空間不足或已停用，請檢查隱私設定');
@@ -293,6 +294,7 @@ function fillProfileToForm(profile) {
   if (document.getElementById('profileCuAddress')) document.getElementById('profileCuAddress').value = profile.cuAddress || '';
   if (document.getElementById('profileCuPhone')) document.getElementById('profileCuPhone').value = profile.cuPhone || '';
   if (document.getElementById('profileAgentName')) document.getElementById('profileAgentName').value = profile.agentName || '';
+  if (document.getElementById('profileBylawArticle')) document.getElementById('profileBylawArticle').value = profile.cuBylawArticle || '';
 }
 
 function updateDocFormFromProfile() {
@@ -384,7 +386,9 @@ function initDocGenerator() {
   const formInputs = [
     'docType', 'docCreditorName', 'docCreditorTaxId', 'docCreditorRep', 'docCreditorAddress', 'docCreditorPhone', 'docAgentName', 'docAgentId',
     'docDebtorName', 'docDebtorId', 'docDebtorAddress', 'docDebtorMemberNo',
-    'docHasGuarantor', 'docGuarantorName', 'docGuarantorId', 'docGuarantorAddress',
+    'docHasGuarantor', 'docGuarantorName', 'docGuarantorId', 'docGuarantorAddress', 'docExtraParties',
+    'docDebtorDeceased', 'docHeirs', 'docBasisType', 'docPenaltyRatio', 'docPenaltyStartDate',
+    'docRateChanged', 'docOrigRate', 'docOrigPenaltyRatio', 'docRateChangeDate', 'docOrderIssueDate', 'docNoticeDate',
     'docLoanDate', 'docLoanAmount', 'docPrincipal', 'docInterestRate', 'docLastPaymentDate', 'docInterestStartDate',
     'docManualInterest', 'docManualPenalty', 'docCourt',
     'docShareAmount', 'docDividendAmount', 'docDocNo',
@@ -482,6 +486,23 @@ function initDocGenerator() {
     });
   }
 
+  // 下載存證信函催告後 6 個月起訴期限鬧鐘
+  const noticeIcsBtn = document.getElementById('btnNoticeICS');
+  if (noticeIcsBtn) {
+    noticeIcsBtn.addEventListener('click', () => {
+      const data = getDocFormData();
+      const info = data.noticeDate ? calculate6MonthNoticeExpiry(data.noticeDate) : null;
+      if (!info) return;
+      const ics = generateNoticeDeadlineICS({
+        debtorName: data.debtorName,
+        noticeDateStr: data.noticeDate,
+        expiryDateStr: info.expiryDateStr
+      });
+      downloadFile(`${data.debtorName || '債務人'}_催告6個月起訴期限.ics`, ics, 'text/calendar;charset=utf-8');
+      showToast('📅 已下載 6 個月起訴期限行事曆鬧鐘！');
+    });
+  }
+
   // 存入 5 年時效台帳
   // 台帳的 5 年時效是自「債權憑證核發日」起算，書狀表單裡並沒有這個日期
   // （舊版曾直接拿「最後繳息日」代入，算出來的到期日是錯的），
@@ -555,30 +576,44 @@ function handleAddressAutoCourt(inputId) {
 
 function updateDocTypeVisibility() {
   const type = document.getElementById('docType')?.value || 'payment_order';
-  const execWrap = document.getElementById('executionSpecificFields');
-  const renewWrap = document.getElementById('renewCertSpecificFields');
-  const titleTypeWrap = document.getElementById('titleTypeWrap');
-  const offsetWrap = document.getElementById('offsetSpecificFields');
-  const deceasedWrap = document.getElementById('deceasedSpecificFields');
-  const courtGroup = document.getElementById('courtSelectGroup');
-  const guarantorGroup = document.getElementById('guarantorCheckboxGroup');
-  const generalHint = document.getElementById('generalDocHint');
+  const checked = (id) => document.getElementById(id)?.checked || false;
+  const show = (id, visible, display = 'block') => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = visible ? display : 'none';
+  };
 
-  const hasSpecial = (type === 'execution' || type === 'renew_cert' || type === 'offset_share' || type === 'offset_board' || type === 'household_apply' || type === 'inheritance_inquiry' || type === 'inheritance_demand');
+  const isPayment = type === 'payment_order';
+  const isFinal = type === 'payment_order_final';
+  const isLetter = type === 'demand_letter' || type === 'offset_letter';
+  const isInheritanceDoc = type === 'household_apply' || type === 'inheritance_inquiry' || type === 'inheritance_demand';
+  const deceased = (isPayment || isFinal) && checked('docDebtorDeceased');
 
-  if (execWrap) execWrap.style.display = (type === 'execution') ? 'block' : 'none';
-  if (renewWrap) renewWrap.style.display = (type === 'renew_cert') ? 'block' : 'none';
-  if (titleTypeWrap) titleTypeWrap.style.display = (type === 'execution' || type === 'renew_cert') ? 'block' : 'none';
-  if (offsetWrap) offsetWrap.style.display = (type === 'offset_share' || type === 'offset_board') ? 'block' : 'none';
-  if (deceasedWrap) deceasedWrap.style.display = (type === 'household_apply' || type === 'inheritance_inquiry' || type === 'inheritance_demand') ? 'block' : 'none';
-  if (generalHint) generalHint.style.display = hasSpecial ? 'none' : 'block';
+  show('executionSpecificFields', type === 'execution');
+  show('renewCertSpecificFields', type === 'renew_cert');
+  show('titleTypeWrap', type === 'execution' || type === 'renew_cert');
+  show('titleCaseNoWrap', type === 'execution' || isFinal);
+  show('orderIssueWrap', isFinal);
+  show('offsetSpecificFields', type === 'offset_share' || type === 'offset_board');
+  show('letterSpecificFields', isLetter);
 
-  if (courtGroup) {
-    courtGroup.style.display = (type === 'offset_share' || type === 'offset_board' || type === 'household_apply') ? 'none' : 'flex';
-  }
-  if (guarantorGroup) {
-    guarantorGroup.style.display = (type === 'household_apply' || type === 'inheritance_inquiry') ? 'none' : 'block';
-  }
+  // 支付命令專屬（債權憑據、違約金比例、利率變動）
+  show('paymentOnlyFields', isPayment);
+  show('rateChangeWrap', isPayment && checked('docRateChanged'));
+
+  // 債務人死亡：支付命令與確定證明書列繼承人；死亡日期僅支付命令需要
+  show('deceasedToggleGroup', isPayment || isFinal);
+  show('heirsFieldsWrap', deceased);
+  show('deceasedSpecificFields', isInheritanceDoc || (isPayment && deceased));
+  show('docHouseholdOfficeGroup', isInheritanceDoc);
+  show('docAgentIdGroup', isInheritanceDoc);
+
+  // 存證信函、股金抵銷公文不送法院，不需管轄法院
+  const noCourt = ['offset_share', 'offset_board', 'household_apply', 'demand_letter', 'offset_letter'].includes(type);
+  show('courtSelectGroup', !noCourt, 'flex');
+  show('guarantorCheckboxGroup', !(type === 'household_apply' || type === 'inheritance_inquiry'));
+
+  // 僅支付命令沿用「已就緒」提示，其餘公文各有專屬欄位區
+  show('generalDocHint', isPayment);
 }
 
 /**
@@ -608,6 +643,7 @@ function getDocFormData() {
     creditorPhone: (profile.cuPhone || '').trim(),
     agentName: (profile.agentName || '').trim(),
     agentId: text('docAgentId'),
+    bylawArticle: (profile.cuBylawArticle || '').trim(),
 
     debtorName: text('docDebtorName'),
     debtorId: text('docDebtorId'),
@@ -618,6 +654,9 @@ function getDocFormData() {
     guarantorName: text('docGuarantorName'),
     guarantorId: text('docGuarantorId'),
     guarantorAddress: text('docGuarantorAddress'),
+    extraParties: raw('docExtraParties'),
+    debtorDeceased: document.getElementById('docDebtorDeceased')?.checked || false,
+    heirs: raw('docHeirs'),
 
     loanDate: raw('docLoanDate'),
     loanAmount: raw('docLoanAmount'),
@@ -628,6 +667,15 @@ function getDocFormData() {
     interestStartDate: raw('docInterestStartDate') || addDaysToDateStr(lastPaymentDate, 1),
     manualInterest: raw('docManualInterest') || 0,
     manualPenalty: raw('docManualPenalty') || 0,
+    basisType: raw('docBasisType') || 'loan',
+    penaltyRatio: raw('docPenaltyRatio'),
+    penaltyStartDate: raw('docPenaltyStartDate'),
+    rateChanged: document.getElementById('docRateChanged')?.checked || false,
+    origRate: raw('docOrigRate'),
+    origPenaltyRatio: raw('docOrigPenaltyRatio'),
+    rateChangeDate: raw('docRateChangeDate'),
+    orderIssueDate: raw('docOrderIssueDate'),
+    noticeDate: raw('docNoticeDate'),
     courtName: courtName,
 
     shareAmount: raw('docShareAmount'),
@@ -667,6 +715,15 @@ function updateDocPreview() {
     case 'payment_order':
       text = generatePaymentOrderDoc(data);
       break;
+    case 'payment_order_final':
+      text = generatePaymentOrderFinalDoc(data);
+      break;
+    case 'demand_letter':
+      text = generateDemandLetterDoc(data);
+      break;
+    case 'offset_letter':
+      text = generateOffsetLetterDoc(data);
+      break;
     case 'execution':
       text = generateExecutionDoc(data);
       break;
@@ -693,6 +750,7 @@ function updateDocPreview() {
   }
 
   currentRawDocText = text;
+  updateLetterAids(data, text);
 
   const previewEl = document.getElementById('docPreviewText');
   if (previewEl) {
@@ -716,6 +774,48 @@ function updateDocPreview() {
   const chineseEl = document.getElementById('chineseAmountHint');
   if (chineseEl) {
     chineseEl.textContent = `合計：${toChineseCurrency(total)}（本金：${p.toLocaleString()}，利息：${mi.toLocaleString()}，違約金：${mp.toLocaleString()}）`;
+  }
+}
+
+/**
+ * 存證信函輔助：民法第 130 條 6 個月起訴期限提醒、郵局用紙（每行 20 字、每頁 10 行）排版試算
+ */
+function updateLetterAids(data, text) {
+  if (data.docType !== 'demand_letter' && data.docType !== 'offset_letter') return;
+
+  const box = document.getElementById('noticeDeadlineBox');
+  const icsBtn = document.getElementById('btnNoticeICS');
+  const info = data.noticeDate ? calculate6MonthNoticeExpiry(data.noticeDate) : null;
+
+  if (box) {
+    if (!info) {
+      box.className = 'alert-box info';
+      box.textContent = '填入存證信函送達日後，這裡會顯示民法第 130 條的 6 個月起訴期限。';
+    } else if (info.isExpired) {
+      box.className = 'alert-box danger';
+      box.textContent = `⚠️ 自 ${data.noticeDate} 送達起算，6 個月期限已於 ${info.expiryDateStr} 屆滿；若未於期限內聲請支付命令或起訴，此次催告對時效的中斷視為不中斷。`;
+    } else {
+      box.className = 'alert-box info';
+      box.textContent = `⏰ 須於 ${info.expiryDateStr} 前（尚餘 ${info.remainingDays} 天）聲請支付命令或起訴；逾期未起訴，此次催告對時效的中斷視為不中斷（民法第 130 條）。`;
+    }
+  }
+  if (icsBtn) icsBtn.style.display = (info && !info.isExpired) ? '' : 'none';
+
+  const bodyStart = text.indexOf('內容：\n');
+  const layout = calcPostalLetterLayout(bodyStart >= 0 ? text.slice(bodyStart + 4) : '');
+  const summary = document.getElementById('letterLayoutSummary');
+  const linesEl = document.getElementById('letterLayoutLines');
+  if (summary) {
+    summary.textContent = `📐 郵局用紙排版：全文 ${layout.charCount} 字，共 ${layout.lineCount} 行（每行 ${layout.charsPerLine} 字），約 ${layout.pageCount} 頁（每頁 ${layout.linesPerPage} 行）— 點此展開逐行抄寫`;
+  }
+  if (linesEl) {
+    const out = [];
+    layout.lines.forEach((line, i) => {
+      const inPage = i % layout.linesPerPage;
+      if (inPage === 0) out.push(`【第 ${Math.floor(i / layout.linesPerPage) + 1} 頁】`);
+      out.push(`${String(inPage + 1).padStart(2, ' ')}. ${line}`);
+    });
+    linesEl.textContent = out.join('\n');
   }
 }
 
