@@ -2,7 +2,7 @@
  * 法律核心運算引擎 (core-legal.js)
  * 包含：
  * 1. 中文大寫金額轉換
- * 2. 民法 5 年消滅時效計算
+ * 2. 5 年換證預警（利息請求權時效 5 年）計算
  * 3. 民法第 205 條 16% 利率上限檢核
  * 4. 民法第 130 條催告 6 個月起訴時效計算
  * 5. 法院規費計算、選用利息試算
@@ -161,8 +161,9 @@ function addMonthsWithEomAdjust(dateObj, monthsToAdd) {
 }
 
 /**
- * 計算 5 年消滅時效到期日與狀態燈號
- * 依民法第 126 條 (利息 5 年) 與第 137 條第 3 項 (換發債權憑證重行起算 5 年)
+ * 計算債權憑證「5 年預警日」與狀態燈號
+ * 依據：利息請求權時效 5 年（民法第 126 條），本金 15 年（民法第 125 條）。
+ * 5 年是保守的預警設計，用意是在利息時效屆滿前換證，並不代表本金 5 年即失效。
  * @param {string} issueDateStr YYYY-MM-DD
  * @param {Date} [currentDate] 預設為當前時間
  */
@@ -208,7 +209,7 @@ function calculate5YearExpiry(issueDateStr, currentDate = new Date()) {
 
   if (remainingDays <= 0) {
     status = 'expired';
-    statusText = '已逾 5 年時效（過期）';
+    statusText = '已逾 5 年預警日（利息時效可能屆滿）';
     color = '#1E293B'; // 灰黑
   } else if (remainingDays <= 90) {
     status = 'urgent';
@@ -216,7 +217,7 @@ function calculate5YearExpiry(issueDateStr, currentDate = new Date()) {
     color = '#DC2626'; // 紅 (< 3 個月)
   } else if (remainingDays <= 180) {
     status = 'warning';
-    statusText = '時效預警（6個月內屆滿）';
+    statusText = '5 年預警（6 個月內到期）';
     color = '#D97706'; // 黃 (3~6 個月)
   }
 

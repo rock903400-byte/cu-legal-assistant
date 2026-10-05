@@ -12,7 +12,7 @@ const MIN_LIVING_EXPENSES_115 = {
   'tainan': { name: '臺南市', amount: 15515 },
   'kaohsiung': { name: '高雄市', amount: 16970 },
   'taiwan_province': { name: '臺灣省各縣市 (含彰投苗雲嘉屏東花宜基澎)', amount: 15515 },
-  'kinmen_lienchiang': { name: '福建省 (金門縣、連江縣)', amount: 14064 }
+  'kinmen_lienchiang': { name: '福建省 (金門縣、連江縣)', amount: 15173 }
 };
 
 /**

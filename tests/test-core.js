@@ -28,8 +28,6 @@ const {
   generatePaymentOrderDoc,
   generateExecutionDoc,
   generateRenewCertificateDoc,
-  generateOffsetShareDoc,
-  generateOffsetBoardResolutionDoc,
   generatePaymentOrderFinalDoc,
   parseThirdPartiesText,
   generateDemandLetterDoc,
@@ -111,7 +109,7 @@ console.log('\n5. 測試公文範本庫');
 
 // 5.1 支付命令
 const paymentOrderDoc = generatePaymentOrderDoc({
-  creditorName: '有限責任臺中市第一儲蓄互助社',
+  creditorName: '臺中市第一儲蓄互助社',
   debtorName: '張大同',
   principal: 210000,
   manualInterest: 15000,
@@ -123,7 +121,7 @@ assert.strictEqual(paymentOrderDoc.includes('新臺幣貳拾貳萬柒仟元整')
 
 // 5.2 強制執行
 const execDoc = generateExecutionDoc({
-  creditorName: '有限責任臺中市第一儲蓄互助社',
+  creditorName: '臺中市第一儲蓄互助社',
   debtorName: '張大同',
   principal: 210000,
   courtName: '臺中',
@@ -134,7 +132,7 @@ assert.strictEqual(execDoc.includes('中華民國人壽保險商業同業公會'
 
 // 5.3 換發／核發憑證（依執行名義種類決定）
 const renewDoc = generateRenewCertificateDoc({
-  creditorName: '有限責任臺中市第一儲蓄互助社',
+  creditorName: '臺中市第一儲蓄互助社',
   debtorName: '張大同',
   principal: 210000,
   courtName: '臺中',
@@ -143,7 +141,7 @@ const renewDoc = generateRenewCertificateDoc({
 assert.strictEqual(renewDoc.includes('民事聲請換發債權憑證狀'), true);
 assert.strictEqual(renewDoc.includes('債權憑證正本一份'), true);
 const issueDoc = generateRenewCertificateDoc({
-  creditorName: '有限責任臺中市第一儲蓄互助社',
+  creditorName: '臺中市第一儲蓄互助社',
   debtorName: '張大同',
   principal: 210000,
   courtName: '臺中',
@@ -151,28 +149,6 @@ const issueDoc = generateRenewCertificateDoc({
 });
 assert.strictEqual(issueDoc.includes('民事聲請核發債權憑證狀'), true);
 assert.strictEqual(issueDoc.includes('支付命令及確定證明書正本各一份'), true);
-
-// 5.4 股金抵銷通知書（依本社章程；《儲蓄互助社法》第 14 條是退股程序，不可引為抵銷依據）
-const offsetDoc = generateOffsetShareDoc({
-  creditorName: '有限責任臺中市第一儲蓄互助社',
-  debtorName: '張大同',
-  principal: 100000,
-  shareAmount: 60000,
-  dividendAmount: 3000,
-  bylawArticle: '第十七條'
-});
-assert.strictEqual(offsetDoc.includes('本社章程第 十七 條'), true);
-assert.strictEqual(offsetDoc.includes('儲蓄互助社法'), false);
-assert.strictEqual(offsetDoc.includes('抵銷後剩餘欠款：新臺幣 37,000 元整'), true);
-
-// 5.5 股金抵銷簽呈
-const boardDoc = generateOffsetBoardResolutionDoc({
-  creditorName: '有限責任臺中市第一儲蓄互助社',
-  debtorName: '張大同',
-  principal: 100000,
-  shareAmount: 60000
-});
-assert.strictEqual(boardDoc.includes('行使股金抵銷權案'), true);
 
 console.log('  ✅ 公文範本生成全部通過');
 
@@ -233,14 +209,14 @@ console.log('  ✅ CSV / ICS 逸出處理全部通過');
 console.log('\n10. 迴歸測試：書狀內容正確性');
 
 const fullData = {
-  creditorName: '有限責任臺中市第一儲蓄互助社', debtorName: '王小明', principal: 200000, loanAmount: 300000,
+  creditorName: '臺中市第一儲蓄互助社', debtorName: '王小明', principal: 200000, loanAmount: 300000,
   interestRate: 12, loanDate: '2022-01-10', lastPaymentDate: '2023-05-10', interestStartDate: '2023-05-11',
   manualInterest: 5000, manualPenalty: 1000, shareAmount: 60000, dividendAmount: 3000, courtName: '臺中',
   targets: { bankDeposit: true, insurance: true, salary: true, taxData: true }
 };
 const allGenerators = {
-  generatePaymentOrderDoc, generateExecutionDoc, generateRenewCertificateDoc, generateOffsetShareDoc,
-  generateOffsetBoardResolutionDoc, generatePaymentOrderFinalDoc, generateDemandLetterDoc, generateOffsetLetterDoc
+  generatePaymentOrderDoc, generateExecutionDoc, generateRenewCertificateDoc,
+  generatePaymentOrderFinalDoc, generateDemandLetterDoc, generateOffsetLetterDoc
 };
 // 10.1 toChineseCurrency 已含「新臺幣」，範本不得再加一次；「民國」亦同
 Object.entries(allGenerators).forEach(([name, gen]) => {
@@ -305,7 +281,7 @@ console.log('  ✅ 書狀內容正確性迴歸測試通過');
 console.log('\n11. 第二批功能：存證信函與書狀變體');
 
 const batch2 = {
-  creditorName: '有限責任臺中市第一儲蓄互助社', creditorRep: '陳理事長', creditorAddress: '臺中市西區民生路 100 號',
+  creditorName: '臺中市第一儲蓄互助社', creditorRep: '陳理事長', creditorAddress: '臺中市西區民生路 100 號',
   debtorName: '王小明', debtorId: 'B123456789', debtorAddress: '臺中市西區五權路 50 號',
   principal: 200000, loanAmount: 300000, loanDate: '2022-01-10', lastPaymentDate: '2023-05-10', interestStartDate: '2023-05-11',
   interestRate: '12', courtName: '臺中', manualInterest: 5000, manualPenalty: 1000, bylawArticle: '第十七條'
@@ -348,7 +324,8 @@ noticeIcs.split('\r\n').forEach(l => assert.strictEqual(Buffer.byteLength(l, 'ut
 const finalDoc = generatePaymentOrderFinalDoc({ ...withGuarantor2, titleCaseNo: '112 年度司促字第 123 號', orderIssueDate: '2023-08-15' });
 assert.strictEqual(finalDoc.includes('民事聲請支付命令確定證明書狀'), true);
 assert.strictEqual(finalDoc.includes('聲請人與王小明、李小華間因 112 年度司促字第 123 號 事件，經 貴院於 民國 112 年 8 月 15 日 核發支付命令，並已確定在案'), true);
-assert.strictEqual(finalDoc.includes('依民事訴訟法第 521 條、第 399 條第 1 項規定，聲請 貴院付與該支付命令確定證明書'), true);
+assert.strictEqual(finalDoc.includes('依民事訴訟法第 521 條第 2 項、第 399 條第 1 項及第 4 項規定，聲請 貴院付與該支付命令確定證明書'), true);
+assert.strictEqual(finalDoc.includes('第 521 條、第 399 條第 1 項規定'), false); // 舊寫法（現行 §521 II 才是付與裁定確定證明書）
 const finalDeceased = generatePaymentOrderFinalDoc({ ...batch2, debtorDeceased: true, heirs: '王大明｜C111111111｜臺北市\n王小華' });
 assert.strictEqual(finalDeceased.includes('聲請人與王大明、王小華間'), true);
 
@@ -399,17 +376,13 @@ assert.deepStrictEqual(parsePartiesText('甲｜A1｜台北\n\n乙, B2 ,新北\n�
   { name: '甲', id: 'A1', address: '台北' }, { name: '乙', id: 'B2', address: '新北' }, { name: '丙', id: '', address: '' }
 ]);
 
-// 11.11 股金抵銷簽呈：不得有假專職姓名、假逾期月數
-const boardBlank = generateOffsetBoardResolutionDoc({});
-assert.strictEqual(boardBlank.includes('李專職') || boardBlank.includes('陳理事長'), false);
-assert.strictEqual(boardBlank.includes('累計逾期已逾 ○ 個月'), true);
-assert.strictEqual(/累計逾期已逾 \d+ 個月/.test(generateOffsetBoardResolutionDoc({ lastPaymentDate: '2020-01-01' })), true);
-assert.strictEqual(generateOffsetBoardResolutionDoc({ bylawArticle: '十七' }).includes('本社章程第 十七 條'), true);
-assert.strictEqual(generateOffsetBoardResolutionDoc({ bylawArticle: '十七' }).includes('儲蓄互助社法'), false);
-
 // 11.12 設定：啟用清單涵蓋新公文，且每一種都有對應範本
-['demand_letter', 'offset_letter', 'payment_order_final', 'offset_share', 'offset_board'].forEach(t => {
+['demand_letter', 'offset_letter', 'payment_order_final'].forEach(t => {
   assert.strictEqual(APP_CONFIG.ENABLED_DOC_TYPES.includes(t), true, `未啟用 ${t}`);
+});
+// 股金抵銷通知書、簽呈已移除：股金扣除貸款只出現在已進入執行階段，改以存證信函辦理
+['offset_share', 'offset_board'].forEach(t => {
+  assert.strictEqual(APP_CONFIG.ENABLED_DOC_TYPES.includes(t), false, `${t} 不應再啟用`);
 });
 assert.strictEqual(APP_CONFIG.ENABLED_DOC_TYPES[0], 'payment_order'); // 預設仍為支付命令
 console.log('  ✅ 第二批功能測試通過');
@@ -420,6 +393,7 @@ console.log('\n12. 第三批功能：強制執行狀與債權憑證');
 // 12.1 最低生活費 1.2 倍：由地址判斷區域（台／臺皆可），金額與扣薪試算同一份標準
 assert.strictEqual(getMinLivingStandard('taichung').standard1_2, 19717);
 assert.strictEqual(getMinLivingStandard('taipei').standard1_2, 24893);
+assert.strictEqual(getMinLivingStandard('kinmen_lienchiang').standard1_2, 18208);
 assert.strictEqual(getMinLivingStandard('不存在'), null);
 assert.strictEqual(deriveLivingRegionFromAddress('台中市西區五權路 50 號'), 'taichung');
 assert.strictEqual(deriveLivingRegionFromAddress('臺北市大安區'), 'taipei');
@@ -533,5 +507,42 @@ assert.strictEqual(wordHtml.includes('<title>王&amp;小&lt;明&gt; 法催公文
 assert.strictEqual(wordHtml.includes('<pre>') && wordHtml.includes('標楷體') && wordHtml.includes('size: 595.3pt 841.9pt'), true); // 版面設定維持不變
 assert.strictEqual(buildWordDocHtml('t', '').includes('<pre></pre>'), true);
 console.log('  ✅ Word 匯出逸出通過');
+
+// 14. 法規核對後的修正（依全國法規資料庫與司法院公告）
+console.log('\n14. 法規核對後的修正');
+// 14.1 115 年最低生活費與「生活所必需（未扶養）」：與司法院《115 年每月生活所必需數額一覽表》逐區相符
+const official115 = {
+  taiwan_province: [15515, 18618], taipei: [20744, 24893], kaohsiung: [16970, 20364], new_taipei: [17750, 21300],
+  taichung: [16431, 19717], tainan: [15515, 18618], taoyuan: [17186, 20623], kinmen_lienchiang: [15173, 18208]
+};
+Object.entries(official115).forEach(([region, [base, necessity]]) => {
+  assert.strictEqual(MIN_LIVING_EXPENSES_115[region].amount, base, `${region} 最低生活費`);
+  assert.strictEqual(getMinLivingStandard(region).standard1_2, necessity, `${region} 1.2 倍`);
+});
+// 14.2 社名預設：《儲蓄互助社法》第 6 條只要求標明「儲蓄互助社」，不得預設「有限責任」
+['generatePaymentOrderDoc', 'generateExecutionDoc', 'generateRenewCertificateDoc', 'generatePaymentOrderFinalDoc',
+  'generateDemandLetterDoc', 'generateOffsetLetterDoc'].forEach(name => {
+  const out = require('../js/templates')[name]({});
+  assert.strictEqual(out.includes('○○縣○○儲蓄互助社'), true, `${name} 未填社名應顯示「○○縣○○儲蓄互助社」`);
+  assert.strictEqual(out.includes('有限責任'), false, `${name} 不得預設「有限責任」`);
+});
+// 14.3 換證狀不得再引用錯誤條文：§137 III 不是中斷規定，§27 是發給憑證規定
+const renewClean = generateRenewCertificateDoc({ ...batch2, titleType: 'payment_order' });
+assert.strictEqual(renewClean.includes('中斷消滅時效') || renewClean.includes('第 137 條'), false);
+assert.strictEqual(renewClean.includes('依強制執行法第 27 條規定'), true);
+// 14.4 時效說明：5 年是「利息」請求權時效的預警，不得宣稱憑證 5 年失效或過期
+const fs = require('fs');
+const expired = calculate5YearExpiry('2015-01-01', new Date('2026-01-01'));
+assert.strictEqual(expired.status, 'expired');
+assert.strictEqual(expired.statusText.includes('預警') && !expired.statusText.includes('過期'), true);
+const icsNew = generateICSContent([{ id: 'x', debtorName: '王小明', certNo: 'c', principal: 1, issueDate: '2022-05-10', expiryDateStr: '2027-05-10' }]);
+const icsFlat = icsNew.split('\r\n ').join(''); // 長行依 RFC 5545 摺疊，比對前先展開
+assert.strictEqual(icsFlat.includes('變廢紙') || icsFlat.includes('消滅時效今日屆滿'), false);
+assert.strictEqual(icsFlat.includes('預警日'), true);
+assert.strictEqual(icsFlat.includes('民法第 126 條') && icsFlat.includes('第 125 條'), true);
+const html = fs.readFileSync(require('path').join(__dirname, '../index.html'), 'utf8');
+assert.strictEqual(html.includes('第 137 條第 3 項'), false);
+assert.strictEqual(html.includes('利息請求權時效 5 年（民法第 126 條）、本金 15 年（第 125 條）'), true);
+console.log('  ✅ 法規核對後的修正測試通過');
 
 console.log('\n🎉 所有全面升級單元測試全數驗證通過！');

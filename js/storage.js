@@ -280,22 +280,22 @@ UID:cu-statute-${r.id || Date.now()}@creditunion.local
 DTSTAMP:${nowStr}
 DTSTART;VALUE=DATE:${expiryDateCompact}
 DTEND;VALUE=DATE:${expiryDateCompact}
-SUMMARY:【5年時效到期日】儲互社債權憑證換發 - ${name}（${certNo}）
-DESCRIPTION:債務人：${name}\\n身分證字號：${debtorId}\\n債權憑證案號：${certNo}\\n管轄法院：${courtName}\\n未償本金：新臺幣 ${amountStr} 元\\n原核發日：${issueDate}\\n\\n⚠️ 注意：此債權憑證 5 年消滅時效今日屆滿，請確認已具狀向法院聲請換發債權憑證，以免債權憑證失效變廢紙！
+SUMMARY:【5 年預警日】債權憑證換發 - ${name}（${certNo}）
+DESCRIPTION:債務人：${name}\\n身分證字號：${debtorId}\\n債權憑證案號：${certNo}\\n管轄法院：${courtName}\\n未償本金：新臺幣 ${amountStr} 元\\n原核發日：${issueDate}\\n\\n⚠️ 今日是此債權憑證核發滿 5 年的預警日（利息請求權時效 5 年，民法第 126 條；本金 15 年，第 125 條），請確認已具狀向法院聲請換發債權憑證，避免利息請求權罹於時效。
 STATUS:CONFIRMED
 BEGIN:VALARM
 ACTION:DISPLAY
-DESCRIPTION:【6個月前提醒】債權憑證 5 年時效將於半年後到期（債務人：${name}），請準備向法院具狀換發！
+DESCRIPTION:【6個月前提醒】債權憑證 5 年預警日將於半年後到期（債務人：${name}），請準備向法院具狀換發！
 TRIGGER:-P180D
 END:VALARM
 BEGIN:VALARM
 ACTION:DISPLAY
-DESCRIPTION:【3個月前告急】債權憑證 5 年時效將於 90 天後到期（債務人：${name}），請立即送件聲請換發債權憑證！
+DESCRIPTION:【3個月前告急】債權憑證 5 年預警日將於 90 天後到期（債務人：${name}），請立即送件聲請換發債權憑證！
 TRIGGER:-P90D
 END:VALARM
 BEGIN:VALARM
 ACTION:DISPLAY
-DESCRIPTION:【1個月前最後警告】債權憑證 5 年時效即將屆滿（債務人：${name}），請務必於本月完成換證！
+DESCRIPTION:【1個月前最後警告】債權憑證 5 年預警日即將到期（債務人：${name}），請務必於本月完成換證！
 TRIGGER:-P30D
 END:VALARM
 END:VEVENT
@@ -307,7 +307,7 @@ VERSION:2.0
 PRODID:-//CULROC//Credit Union Legal Assistant 5-Year Statute Alarm//ZH
 CALSCALE:GREGORIAN
 METHOD:PUBLISH
-X-WR-CALNAME:儲蓄互助社 5 年債權憑證時效鬧鐘
+X-WR-CALNAME:儲蓄互助社 債權憑證 5 年預警鬧鐘
 X-WR-TIMEZONE:Asia/Taipei
 ${events}END:VCALENDAR`;
 
@@ -445,7 +445,7 @@ function exportToWordDoc(filename, title, textContent) {
  * 匯出 CSV 台帳清冊
  */
 function exportRecordsToCSV(records) {
-  const headers = ['案件ID', '債務人姓名', '身分證字號', '債權憑證/執行案號', '管轄法院', '債權本金', '核發日期', '5年到期日', '剩餘天數', '時效狀態', '連帶保證人', '備註'];
+  const headers = ['案件ID', '債務人姓名', '身分證字號', '債權憑證/執行案號', '管轄法院', '債權本金', '核發日期', '5年預警日', '剩餘天數', '時效狀態', '連帶保證人', '備註'];
   // \u5168\u90E8\u6B04\u4F4D\u4E00\u5F8B\u8D70 csvCell\uFF1A\u7D71\u4E00\u8655\u7406\u96D9\u5F15\u865F\u9038\u51FA\u8207 Excel \u516C\u5F0F\u6CE8\u5165
   const rows = records.map(r => [
     csvCell(r.id),

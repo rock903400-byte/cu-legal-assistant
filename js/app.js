@@ -1,6 +1,6 @@
 /**
  * 主控制器邏輯 (app.js) - 全面升級版 (專職減負 Wizard、情境導航、白話小抄與 A4 擬真)
- * 整合：4 大情境入口、三步驟摺疊導引、司法院訴狀、股金抵銷、存證信函、扣薪計算機、時效 KPI 看板、Word 匯出與草稿自動暫存
+ * 整合：4 大情境入口、三步驟摺疊導引、司法院訴狀、存證信函、扣薪計算機、時效 KPI 看板、Word 匯出與草稿自動暫存
  */
 
 // 儲存原始純文字供複製與下載
@@ -385,13 +385,12 @@ function updateScriptsPreview() {
 function initDocGenerator() {
   const formInputs = [
     'docType', 'docCreditorName', 'docCreditorTaxId', 'docCreditorRep', 'docCreditorAddress', 'docCreditorPhone', 'docAgentName',
-    'docDebtorName', 'docDebtorId', 'docDebtorAddress', 'docDebtorMemberNo',
+    'docDebtorName', 'docDebtorId', 'docDebtorAddress',
     'docHasGuarantor', 'docGuarantorName', 'docGuarantorId', 'docGuarantorAddress', 'docExtraParties',
     'docDebtorDeceased', 'docHeirs', 'docBasisType', 'docPenaltyRatio', 'docPenaltyStartDate',
     'docRateChanged', 'docOrigRate', 'docOrigPenaltyRatio', 'docRateChangeDate', 'docOrderIssueDate', 'docNoticeDate',
     'docLoanDate', 'docLoanAmount', 'docPrincipal', 'docInterestRate', 'docLastPaymentDate', 'docInterestStartDate',
     'docManualInterest', 'docManualPenalty', 'docCourt',
-    'docShareAmount', 'docDividendAmount', 'docDocNo',
     'docDeceasedDate',
     'targetBankDeposit', 'targetBankList', 'targetPostOffice', 'targetPostRep', 'targetSalary', 'targetEmployerName',
     'targetEmployerAddress', 'targetEmployerRep', 'targetSalaryStartMonth', 'docLivingRegion', 'targetLaborInsurance',
@@ -530,7 +529,7 @@ function initDocGenerator() {
         guarantorName: document.getElementById('docGuarantorName')?.value.trim() || '',
         note: `自公文助手建立 (${document.getElementById('docType')?.value})`
       });
-      showToast('請填入「憑證核發日期」後儲存，5 年時效由該日起算');
+      showToast('請填入「憑證核發日期」後儲存，5 年預警日由該日起算');
     });
   }
 
@@ -598,7 +597,6 @@ function updateDocTypeVisibility() {
   show('titleTypeWrap', isExec || isRenew);
   show('titleCaseNoWrap', isExec || isFinal || isRenew);
   show('orderIssueWrap', isFinal);
-  show('offsetSpecificFields', type === 'offset_share' || type === 'offset_board');
   show('letterSpecificFields', isLetter);
 
   // 支付命令專屬（債權憑據、違約金比例、利率變動）
@@ -621,8 +619,8 @@ function updateDocTypeVisibility() {
   // 債權憑證：債務人已離職時才需填原任職單位
   show('resignedEmployerGroup', isRenew && document.getElementById('docRenewReason')?.value === 'resigned');
 
-  // 存證信函、股金抵銷公文不送法院，不需管轄法院
-  const noCourt = ['offset_share', 'offset_board', 'demand_letter', 'offset_letter'].includes(type);
+  // 存證信函不送法院，不需管轄法院
+  const noCourt = ['demand_letter', 'offset_letter'].includes(type);
   show('courtSelectGroup', !noCourt, 'flex');
 
   // 僅支付命令沿用「已就緒」提示，其餘公文各有專屬欄位區
@@ -660,7 +658,6 @@ function getDocFormData() {
     debtorName: text('docDebtorName'),
     debtorId: text('docDebtorId'),
     debtorAddress: text('docDebtorAddress'),
-    debtorMemberNo: text('docDebtorMemberNo'),
 
     hasGuarantor: document.getElementById('docHasGuarantor')?.checked || false,
     guarantorName: text('docGuarantorName'),
@@ -690,9 +687,6 @@ function getDocFormData() {
     noticeDate: raw('docNoticeDate'),
     courtName: courtName,
 
-    shareAmount: raw('docShareAmount'),
-    dividendAmount: raw('docDividendAmount'),
-    docNo: text('docDocNo'),
 
     deceasedDate: deceasedDateVal,
 
@@ -755,12 +749,6 @@ function updateDocPreview() {
       break;
     case 'renew_cert':
       text = generateRenewCertificateDoc(data);
-      break;
-    case 'offset_share':
-      text = generateOffsetShareDoc(data);
-      break;
-    case 'offset_board':
-      text = generateOffsetBoardResolutionDoc(data);
       break;
     default:
       text = generatePaymentOrderDoc(data);
@@ -1201,7 +1189,7 @@ function renderLedgerTable(query = '', filterStatus = 'all') {
             ${daysLeft > 0 ? `剩 ${daysLeft} 天` : `逾期 ${Math.abs(Number(r.remainingDays) || 0)} 天`}
           </span>
         </div>
-        <div class="statute-progress-wrap" title="5年時效已流逝 ${consumedPct}%">
+        <div class="statute-progress-wrap" title="5 年預警期已流逝 ${consumedPct}%">
           <div class="statute-progress-bar ${progressClass}" style="width: ${consumedPct}%;"></div>
         </div>
       </td>
@@ -1300,7 +1288,7 @@ function restoreDrafts() {
   const docDraft = loadDraft(STORAGE_KEYS.DRAFT_DOC);
   if (docDraft && docDraft.data) {
     const d = docDraft.data;
-    // 舊版草稿可能存了現已停用的公文種類（如 offset_share），
+    // 舊版草稿可能存了現已移除的公文種類（如 offset_share），
     // 直接套用會讓 #docType 變成下拉中不存在的值，須先驗證
     if (d.docType && isDocTypeEnabled(d.docType) && document.getElementById('docType')) {
       document.getElementById('docType').value = d.docType;
@@ -1336,7 +1324,6 @@ function initDemoDataButton() {
       docCaseWord: '司執',
       docCaseNo: '98765',
       docCaseSection: '民',
-      docDocNo: '中一互社催字第 115001 號',
       docDeceasedDate: '2024-01-10'
     };
     Object.entries(demoFields).forEach(([id, v]) => {
@@ -1355,9 +1342,6 @@ function initDemoDataButton() {
     if (document.getElementById('docManualInterest')) document.getElementById('docManualInterest').value = 18500;
     if (document.getElementById('docManualPenalty')) document.getElementById('docManualPenalty').value = 3000;
     if (document.getElementById('docCourt')) document.getElementById('docCourt').value = '臺中';
-    if (document.getElementById('docDebtorMemberNo')) document.getElementById('docDebtorMemberNo').value = 'CU-1092';
-    if (document.getElementById('docShareAmount')) document.getElementById('docShareAmount').value = 85000;
-    if (document.getElementById('docDividendAmount')) document.getElementById('docDividendAmount').value = 3600;
 
     const guarantorCheck = document.getElementById('docHasGuarantor');
     if (guarantorCheck) {

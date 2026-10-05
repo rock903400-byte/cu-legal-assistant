@@ -2,14 +2,13 @@
  * 介面功能開關 (config.js)
  *
  * 本系統預設呈現「法催」主線：存證信函催告 → 支付命令 → 確定證明書 → 強制執行 → 債權憑證，
- * 以及股金抵銷。其餘功能（早期關懷話術、法規問答）的程式碼與版型
+ * 其餘功能（早期關懷話術、法規問答）的程式碼與版型
  * 全部保留在專案中，僅由本檔決定是否顯示 —— 改這裡的清單即可隨時開回來。
  *
  * 完整功能的設定值（貼回下方即恢復原本 5 分頁與全部公文）：
  *   ENABLED_TABS: ['tab-docs', 'tab-salary', 'tab-statute', 'tab-scripts', 'tab-faq']
  *   ENABLED_DOC_TYPES: ['payment_order', 'payment_order_final', 'execution', 'renew_cert',
- *                       'demand_letter', 'offset_letter',
- *                       'offset_share', 'offset_board']
+ *                       'demand_letter', 'offset_letter']
  *   SHOW_SCENARIO_NAV: true
  */
 
@@ -18,10 +17,9 @@ const APP_CONFIG = {
   ENABLED_TABS: ['tab-docs', 'tab-salary', 'tab-statute'],
 
   // 公文種類下拉可選的項目
-  // 預設主線：支付命令 → 確定證明書 → 強制執行 → 債權憑證，另含存證信函（催告）與股金抵銷
+  // 預設主線：支付命令 → 確定證明書 → 強制執行 → 債權憑證，另含存證信函（催告、股金扣除貸款）
   ENABLED_DOC_TYPES: ['payment_order', 'payment_order_final', 'execution', 'renew_cert',
-                      'demand_letter', 'offset_letter',
-                      'offset_share', 'offset_board'],
+                      'demand_letter', 'offset_letter'],
 
   // 頂部 4 張情境導航大卡片
   SHOW_SCENARIO_NAV: false

@@ -43,7 +43,7 @@ console.log('🚀 開始執行「儲互社智慧法催助手」全端深度邏�
 // 1. 驗證 8 大公文產出與內容關鍵字
 console.log('【模組一：8 大司法院標準書狀與抵銷公文生成驗證】');
 const testDocData = {
-  creditorName: '有限責任臺中市第一儲蓄互助社',
+  creditorName: '臺中市第一儲蓄互助社',
   creditorTaxId: '04123456',
   creditorRep: '陳理事長',
   creditorAddress: '臺中市西區民生路 100 號',
@@ -52,7 +52,6 @@ const testDocData = {
   debtorName: '張大同',
   debtorId: 'B123456789',
   debtorAddress: '臺中市西區五權路 50 號',
-  debtorMemberNo: 'CU-0886',
   hasGuarantor: true,
   guarantorName: '李小華',
   guarantorId: 'L223456789',
@@ -66,9 +65,6 @@ const testDocData = {
   manualInterest: 12000,
   manualPenalty: 2500,
   courtName: '臺中',
-  shareAmount: 50000,
-  dividendAmount: 2500,
-  docNo: '中一互社催字第 115001 號',
   deceasedDate: '2024-01-10',
   targets: {
     bankDeposit: true,
@@ -105,12 +101,6 @@ assert(doc3.includes('民事聲請換發債權憑證狀') && doc3.includes('強�
 const doc3b = generateRenewCertificateDoc({ ...testDocData, titleType: 'payment_order' });
 assert(doc3b.includes('民事聲請核發債權憑證狀') && doc3b.includes('支付命令及確定證明書正本各一份'), '3-2. 執行名義為支付命令時，債權憑證狀為首次「核發」');
 
-const doc4 = generateOffsetShareDoc(testDocData);
-assert(doc4.includes('本社章程第 十七 條') && !doc4.includes('儲蓄互助社法') && doc4.includes('抵銷權') && doc4.includes('50,000'), '4. 股金抵銷通知書依本社章程條次辦理（不誤引儲蓄互助社法第 14 條）並帶入股金金額');
-
-const doc5 = generateOffsetBoardResolutionDoc(testDocData);
-assert(doc5.includes('理事會審議') && doc5.includes('行使股金抵銷權案') && doc5.includes('210,000'), '5. 理事會股金抵銷簽呈格式完整');
-
 // 未設定本社資料時不得回傳示範用的假社名／統編
 assert(Object.keys(loadCuProfile()).length === 0, '尚未儲存本社資料時，loadCuProfile 回傳空白而非示範假資料');
 
@@ -126,6 +116,12 @@ assert(doc11.includes('民事聲請支付命令確定證明書狀') && doc11.inc
 // 2. 驗證 115 年度全台扣薪試算與極值防呆
 console.log('\n【模組二：115 年度全台最低生活費扣薪計算機驗證】');
 const regions = ['taichung', 'taipei', 'new_taipei', 'taoyuan', 'tainan', 'kaohsiung', 'taiwan_province', 'kinmen_lienchiang'];
+// 115 年「生活所必需（未扶養）」須與司法院官方表逐區相符
+const officialNecessity = { taiwan_province: 18618, taipei: 24893, kaohsiung: 20364, new_taipei: 21300, taichung: 19717, tainan: 18618, taoyuan: 20623, kinmen_lienchiang: 18208 };
+Object.entries(officialNecessity).forEach(([r, v]) => {
+  assert(getMinLivingStandard(r).standard1_2 === v, `縣市 ${r} 1.2 倍基準與司法院 115 年表相符（${v}）`);
+});
+
 regions.forEach(r => {
   const res = calculateSalaryGarnishment({ monthlySalary: 45000, regionCode: r, dependentCount: 1, supportRatio: 0.5 });
   assert(res.baseLivingCost > 14000 && res.garnishableAmount > 0 && res.personalCost === Math.round(res.baseLivingCost * 1.2), `縣市 ${r} 115年最低生活費 ${res.baseLivingCost} 與 1.2倍基準計算正確`);

@@ -67,8 +67,8 @@
       <div class="scenario-card scenario-4" data-scenario="tab-docs" title="點擊前往：8 大司法院訴狀與抵銷公文">
         <div class="scenario-icon-wrap">⚖️</div>
         <div>
-          <div class="scenario-title">生成訴狀 / 股金抵銷</div>
-          <div class="scenario-desc">支付命令、強制執行、除戶查調</div>
+          <div class="scenario-title">生成訴狀 / 存證信函</div>
+          <div class="scenario-desc">存證信函、支付命令、強制執行</div>
         </div>
       </div>
     </section>
@@ -118,17 +118,13 @@
                   <select id="docType" class="form-control" style="font-weight:800; color:var(--navy-accent); font-size:1rem;">
                     <optgroup label="【一、催告（郵局存證信函）】">
                       <option value="demand_letter">1. 《存證信函》清償債務催告</option>
-                      <option value="offset_letter">2. 《存證信函》股金扣除貸款通知（已進入執行階段）</option>
+                      <option value="offset_letter">2. 《存證信函》股金扣除貸款通知（限已進入執行階段）</option>
                     </optgroup>
                     <optgroup label="【二、司法訴訟與執行程序】">
                       <option value="payment_order" selected>3. 《民事支付命令聲請狀》（民事訴訟法第 508 條）</option>
                       <option value="payment_order_final">4. 《聲請支付命令確定證明書狀》（民事訴訟法第 521 條）</option>
                       <option value="execution">5. 《民事強制執行聲請狀》（含扣押保險/存款/薪資）</option>
                       <option value="renew_cert">6. 《民事聲請核發／換發債權憑證狀》（強制執行法第 27 條）</option>
-                    </optgroup>
-                    <optgroup label="【三、股金抵銷（依本社章程）】">
-                      <option value="offset_share">7. 《社員逾期放款以留存股金及股息抵銷通知書》</option>
-                      <option value="offset_board">8. 《理監事會審議逾期放款行使股金抵銷權簽呈》</option>
                     </optgroup>
                   </select>
                 </div>
@@ -342,7 +338,7 @@
             </div>
           </div>
 
-          <!-- 步驟 3：特定標的與附加設定（強制執行／股金抵銷／繼承查調） -->
+          <!-- 步驟 3：特定標的與附加設定（強制執行／存證信函／債務人死亡） -->
           <div class="accordion-step-card" id="stepCard3">
             <div class="accordion-header" onclick="toggleAccordion('stepCard3')">
               <div class="accordion-title-wrap">
@@ -353,34 +349,6 @@
             </div>
             <div class="accordion-body">
               
-              <!-- 股金抵銷專屬欄位 (依本社章程) -->
-              <div id="offsetSpecificFields" style="display:none; margin-bottom:14px;">
-                <h3 style="font-size:0.98rem; font-weight:800; color:var(--navy-primary); margin-bottom:8px;">
-                  🏦 儲蓄互助社股金抵銷專用欄位（依本社章程）：
-                </h3>
-                <div class="form-grid">
-                  <div class="form-group">
-                    <label for="docDebtorMemberNo">借款人社員編號</label>
-                    <input type="text" id="docDebtorMemberNo" class="form-control" placeholder="例：CU-0886">
-                  </div>
-                  <div class="form-group">
-                    <label for="docShareAmount">留存股金餘額 (元)</label>
-                    <input type="number" id="docShareAmount" class="form-control" placeholder="例：50000">
-                    <div class="field-tip-box">
-                      💡 實務小抄：抵銷依據是「本社章程」條文，章程條次請先到右上角「本社資料設定」填寫。
-                    </div>
-                  </div>
-                  <div class="form-group">
-                    <label for="docDividendAmount">歷年未領股息 (元)</label>
-                    <input type="number" id="docDividendAmount" class="form-control" placeholder="例：2500">
-                  </div>
-                  <div class="form-group">
-                    <label for="docDocNo">發文字號</label>
-                    <input type="text" id="docDocNo" class="form-control" placeholder="例：中一互社催字第 115001 號">
-                  </div>
-                </div>
-              </div>
-
               <!-- 債務人死亡資料（支付命令、債權憑證用） -->
               <div id="deceasedSpecificFields" style="display:none; margin-bottom:14px;">
                 <h3 style="font-size:0.98rem; font-weight:800; color:var(--navy-primary); margin-bottom:8px;">
@@ -749,7 +717,7 @@
                   <option value="tainan">臺南市（115年度 15,515 元/月，1.2倍基準為 18,618 元）</option>
                   <option value="kaohsiung">高雄市（115年度 16,970 元/月，1.2倍基準為 20,364 元）</option>
                   <option value="taiwan_province">臺灣省各縣市 (彰投苗雲嘉屏東花宜基澎)（115年度 15,515 元/月，1.2倍基準為 18,618 元）</option>
-                  <option value="kinmen_lienchiang">金門縣、連江縣（115年度 14,064 元/月，1.2倍基準為 16,877 元）</option>
+                  <option value="kinmen_lienchiang">金門縣、連江縣（115年度 15,173 元/月，1.2倍基準為 18,208 元）</option>
                 </select>
               </div>
 
@@ -804,7 +772,7 @@
           <div>
             <h2 class="card-title">⏰ 債權憑證 5 年消滅時效管理台帳</h2>
             <p style="font-size:0.85rem; color:var(--muted); margin-top:4px;">
-              依民法第 126 條及第 137 條第 3 項：憑證核發滿 5 年時效消滅。點擊下方 KPI 卡片可即時篩選案件。
+              利息請求權時效 5 年（民法第 126 條）、本金 15 年（第 125 條）；本台帳以憑證核發日起 5 年為預警日，提醒在利息時效屆滿前換證。點擊下方 KPI 卡片可即時篩選案件。
             </p>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -850,9 +818,9 @@
             <div class="kpi-sub">時效狀態正常維護中</div>
           </div>
           <div class="kpi-card kpi-expired" data-filter="expired" title="點擊檢視已逾期案件">
-            <div class="kpi-label">⚫ 已逾 5 年時效</div>
+            <div class="kpi-label">⚫ 已逾 5 年預警日</div>
             <div class="kpi-val" id="kpiExpiredCount" style="color:#475569;">0</div>
-            <div class="kpi-sub">可能已罹於時效消滅</div>
+            <div class="kpi-sub">利息時效可能已屆，請盡速換證</div>
           </div>
         </div>
 
@@ -882,7 +850,7 @@
                 <th>管轄法院</th>
                 <th>債權本金</th>
                 <th>核發日期</th>
-                <th>5年生命週期與進度</th>
+                <th>5年預警期與進度</th>
                 <th>時效狀態</th>
                 <th style="width:210px;">操作</th>
               </tr>
@@ -1035,10 +1003,10 @@
           </div>
 
           <div class="script-card">
-            <h3 style="color:var(--navy-accent);">🏦 2. 儲互社社員逾期放款如何行使「股金抵銷權」？（依本社章程）</h3>
+            <h3 style="color:var(--navy-accent);">🏦 2. 股金扣除貸款：什麼時候寄存證信函？（依本社章程）</h3>
             <p style="font-size:0.95rem; line-height:1.8; color:var(--sub-text);">
-              <b>法律重點：</b>股金抵銷的依據是<b>各社自訂的「本社章程」條文</b>（例如附件存證信函所引「本社章程十七條」），不是《儲蓄互助社法》——該法第 14 條規範的是社員「退股」程序，並無抵銷規定。<br>
-              <b>實務操作：</b>先經理事會決議，再以存證信函通知社員抵銷（可留下送達證明）；請在「本社資料設定」填入本社章程條次，系統會代入存證信函與抵銷通知書。
+              <b>法律重點：</b>股金扣除貸款的依據是<b>各社自訂的「本社章程」條文</b>（例如附件存證信函所引「本社章程十七條」），不是《儲蓄互助社法》——該法第 14 條規範的是社員「退股」程序，並無抵銷規定。<br>
+              <b>實務操作：</b>案件<b>進入執行階段後</b>，寄《存證信函（股金扣除貸款）》通知社員；尚未進入執行階段時，先寄《存證信函（清償債務催告）》即可。請在「本社資料設定」填入本社章程條次，系統會代入存證信函。
             </p>
           </div>
 
@@ -1081,7 +1049,7 @@
       <div class="form-grid">
         <div class="form-group col-span-full">
           <label for="profileCuName">儲蓄互助社完整法定名稱</label>
-          <input type="text" id="profileCuName" class="form-control" placeholder="例：有限責任○○儲蓄互助社">
+          <input type="text" id="profileCuName" class="form-control" placeholder="例：○○縣○○儲蓄互助社">
         </div>
         <div class="form-group">
           <label for="profileCuTaxId">統一編號</label>
@@ -1171,7 +1139,7 @@
           <div class="form-group">
             <label for="modalIssueDate">憑證核發日期 <span style="color:#DC2626;">*</span></label>
             <input type="date" id="modalIssueDate" class="form-control" required>
-            <div class="form-hint" style="margin-top:2px;">5 年時效自此日起算：填債權憑證核發日；尚無憑證者填支付命令確定日。</div>
+            <div class="form-hint" style="margin-top:2px;">5 年預警日自此日起算：填債權憑證核發日；尚無憑證者填支付命令確定日。</div>
           </div>
           <div class="form-group">
             <label for="modalGuarantorName">連帶保證人 (選填)</label>

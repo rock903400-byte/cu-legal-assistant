@@ -4,10 +4,8 @@
  * 1. 民事支付命令聲請狀 (含用印指引)
  * 2. 民事強制執行聲請狀 (含扣押保險解約金、扣押銀行存款、扣薪、查調所得等與用印指引)
  * 3. 民事聲請核發／換發債權憑證狀 (依執行名義種類決定)
- * 4. 社員逾期放款以留存股金及股息抵銷借款通知書 (依本社章程)
- * 5. 理監事會審議逾期放款行使股金抵銷權簽呈
- * 6. 郵局存證信函（清償債務催告）
- * 7. 郵局存證信函（股金扣除貸款）
+ * 4. 郵局存證信函（清償債務催告）
+ * 5. 郵局存證信函（股金扣除貸款，限已進入執行階段）
  * 1-2. 民事聲請支付命令確定證明書狀
  */
 
@@ -156,16 +154,6 @@ function bylawArticleHelper(value) {
   return v || '○○';
 }
 
-/** 自某日起算至今已逾幾整月（簽呈「累計逾期已逾 N 個月」）；日期未填回傳「○」 */
-function overdueMonthsHelper(dateStr) {
-  if (!dateStr) return '○';
-  const [y, m, d] = String(dateStr).split('-').map(Number);
-  if (!y || !m || !d) return '○';
-  const now = new Date();
-  let months = (now.getFullYear() - y) * 12 + (now.getMonth() + 1 - m);
-  if (now.getDate() < d) months -= 1;
-  return Math.max(0, months);
-}
 
 /**
  * 當事人與「連帶」措辭（支付命令、確定證明書、強制執行、債權憑證共用）
@@ -255,7 +243,7 @@ function generatePaymentOrderDoc(data) {
   const loanAmountChinese = chineseMoneyOrBlankHelper(Number(data.loanAmount) || principal);
   const loanAmountNum = numberOrBlankHelper(Number(data.loanAmount) || principal);
 
-  const creditorName = data.creditorName || '有限責任○○儲蓄互助社';
+  const creditorName = data.creditorName || '○○縣○○儲蓄互助社';
   const p = resolveParties(data, '同債務人或詳如借據');
   const claims = buildClaimItems(data, p, '督促程序費用');
   const penaltyRatio = String(data.penaltyRatio ?? '').trim();
@@ -328,14 +316,14 @@ ${exhibits.map((e, i) => `${CN_ORDINALS[i]}、${e}`).join('\n')}
 }
 
 /**
- * 1-2. 產生《民事聲請支付命令確定證明書狀》（民事訴訟法第 521 條、第 399 條第 1 項）
+ * 1-2. 產生《民事聲請支付命令確定證明書狀》（民事訴訟法第 521 條第 2 項、第 399 條第 1 項及第 4 項）
  * 支付命令送達債務人、逾 20 日未異議而確定後，須先取得確定證明書，才能聲請強制執行
  */
 function generatePaymentOrderFinalDoc(data) {
   const roc = getRocDateHelper();
   const principal = Number(data.principal) || 0;
   const totalClaim = principal + (Number(data.manualInterest) || 0) + (Number(data.manualPenalty) || 0);
-  const creditorName = data.creditorName || '有限責任○○儲蓄互助社';
+  const creditorName = data.creditorName || '○○縣○○儲蓄互助社';
   const titleCaseNo = data.titleCaseNo || '○○ 年度 ○ 字第 ○○○○ 號';
 
   // 「聲請人與○○○間」：一般為債務人與連帶保證人；債務人死亡時為繼承人與連帶保證人
@@ -359,7 +347,7 @@ function generatePaymentOrderFinalDoc(data) {
 為聲請付與支付命令確定證明書事：
 
 一、聲請人與${obligorNames}間因 ${titleCaseNo} 事件，經 貴院於 ${rocDateOrBlankHelper(data.orderIssueDate)} 核發支付命令，並已確定在案。
-二、依民事訴訟法第 521 條、第 399 條第 1 項規定，聲請 貴院付與該支付命令確定證明書。
+二、依民事訴訟法第 521 條第 2 項、第 399 條第 1 項及第 4 項規定，聲請 貴院付與該支付命令確定證明書。
 
 此致
 臺灣 ${textOrBlankHelper(data.courtName)} 地方法院  公鑒
@@ -459,7 +447,7 @@ function generateExecutionDoc(data) {
     ? `新臺幣 ${executionFee.toLocaleString()} 元（按請求金額千分之八計算${executionFee === 0 ? '，未滿五千元免徵' : ''}）`
     : '新臺幣 ○○○ 元';
   const titleType = resolveTitleType(data.titleType);
-  const creditorName = data.creditorName || '有限責任○○儲蓄互助社';
+  const creditorName = data.creditorName || '○○縣○○儲蓄互助社';
   const titleCaseNo = data.titleCaseNo || '○○ 年度 ○ 字第 ○○○○ 號';
 
   const p = resolveParties(data, '詳如執行名義');
@@ -620,13 +608,13 @@ function generateRenewCertificateDoc(data) {
   if (p.isDeceased) {
     reasons.push(`惟原債務人 ${p.debtorName} 已於 ${rocDateOrBlankHelper(data.deceasedDate)} 死亡，於其繼承人未為相關權利主張時（詳證物二），其被繼承人之債權債務關係應由繼承人繼承，並依法應負連帶清償責任。`);
   }
-  reasons.push(`茲因債務人迄未履行，${noPropertyText}，為保全聲請人未受償之債權（本金${principalChinese}及其利息、違約金），並依民法第 137 條第 3 項及強制執行法第 27 條規定中斷消滅時效，爰檢同執行名義，特狀請 鈞院准予${action}債權憑證，以維權益，實感德便。`);
+  reasons.push(`茲因債務人迄未履行，${noPropertyText}，為保全聲請人未受償之債權（本金${principalChinese}及其利息、違約金），爰檢同執行名義，依強制執行法第 27 條規定，特狀請 鈞院准予${action}債權憑證，以維權益，實感德便。`);
 
   const docText = `民事聲請${action}債權憑證狀
 案號：${caseNoText}
 股別：${textOrBlankHelper(data.caseSection, '○')} 股
 
-聲請人（即債權人）：${data.creditorName || '有限責任○○儲蓄互助社'}
+聲請人（即債權人）：${data.creditorName || '○○縣○○儲蓄互助社'}
 統一編號：${data.creditorTaxId || ''}
 法定代理人：${data.creditorRep || ''}
 設址：${data.creditorAddress || ''}
@@ -647,7 +635,7 @@ ${exhibits.map((e, i) => `${CN_ORDINALS[i]}、${e}`).join('\n')}
 
 中  華  民  國  ${roc.rocYear}  年  ${roc.month}  月  ${roc.day}  日
 
-具狀人（即聲請人）：${data.creditorName || '有限責任○○儲蓄互助社'}  [ 蓋社圖記 (大章) ]
+具狀人（即聲請人）：${data.creditorName || '○○縣○○儲蓄互助社'}  [ 蓋社圖記 (大章) ]
 法定代理人：${data.creditorRep || ''}  [ 理事長簽章 (小章) ]
 `;
 
@@ -655,85 +643,7 @@ ${exhibits.map((e, i) => `${CN_ORDINALS[i]}、${e}`).join('\n')}
 }
 
 /**
- * 4. 產生《社員逾期放款以留存股金及股息抵銷借款通知書》
- * 抵銷依據為「本社章程」條文（《儲蓄互助社法》第 14 條是退股程序，並無抵銷規定，不可引用）
- */
-function generateOffsetShareDoc(data) {
-  const roc = getRocDateHelper();
-  const principal = Number(data.principal) || 0;
-  const manualInterest = Number(data.manualInterest) || 0;
-  const manualPenalty = Number(data.manualPenalty) || 0;
-  const totalDebt = principal + manualInterest + manualPenalty;
-
-  const shareAmount = Number(data.shareAmount) || 0; // 留存股金
-  const dividendAmount = Number(data.dividendAmount) || 0; // 歷年未領股息
-  const totalOffset = shareAmount + dividendAmount;
-
-  const remainingDebt = Math.max(0, totalDebt - totalOffset);
-  const remainingShare = Math.max(0, totalOffset - totalDebt);
-
-  return `【${data.creditorName || '有限責任○○儲蓄互助社'}】
-函件文號：${data.docNo || '互社放催字第 ○○○○ 號'}
-發文日期：中華民國 ${roc.rocYear} 年 ${roc.month} 月 ${roc.day} 日
-受文者：${data.debtorName || '○○○'} 社員
-社員編號：${data.debtorMemberNo || '○○○○'}
-住址：${data.debtorAddress || ''}
-
-主旨：通知台端於本社之放款逾期未償，本社依本社章程以台端留存之股金及未領股息抵銷借款，請 查照。
-
-說明：
-一、依本社章程第 ${bylawArticleHelper(data.bylawArticle)} 條規定，台端借款逾期未清償時，本社得以台端留存之股金扣除（抵銷）所欠借款，爰依此辦理。
-二、台端於本社之放款截至 ${roc.rocYear} 年 ${roc.month} 月 ${roc.day} 日止，尚欠本金${chineseMoneyOrBlankHelper(principal)}（${numberOrBlankHelper(principal)}元）及約定利息、違約金等，合計欠款總額為${chineseMoneyOrBlankHelper(totalDebt)}（${numberOrBlankHelper(totalDebt)}元）。
-三、經查台端目前於本社留存之股金餘額為${chineseMoneyOrBlankHelper(shareAmount)}（${numberOrBlankHelper(shareAmount)}元）、歷年未領股息新臺幣 ${dividendAmount.toLocaleString()} 元，合計得抵銷總額為${chineseMoneyOrBlankHelper(totalOffset)}（${numberOrBlankHelper(totalOffset)}元）。
-四、本社理事會已決議通過，自發文日起正式行使抵銷權：
-    1. 抵銷前欠款總額：新臺幣 ${totalDebt.toLocaleString()} 元整。
-    2. 抵銷股金及股息：新臺幣 ${totalOffset.toLocaleString()} 元整。
-    3. 抵銷後剩餘欠款：新臺幣 ${remainingDebt.toLocaleString()} 元整（${toChineseCurrencyHelper(remainingDebt)}）。
-    ${remainingDebt > 0 ? '五、抵銷後不足之未償餘額新臺幣 ' + remainingDebt.toLocaleString() + ' 元，請台端於文到 7 日內至本社繳清或來電洽商還款方案；逾期仍未清償者，本社將逕向法院聲請支付命令及強制執行，絕不寬貸。' : '五、抵銷後借款本息已全數清償完畢，剩餘股金新臺幣 ' + remainingShare.toLocaleString() + ' 元已轉入台端活期儲蓄帳戶。'}
-
-此致
-${data.debtorName || '○○○'} 社員
-
-${data.creditorName || '有限責任○○儲蓄互助社'}  [ 蓋社圖記 (大章) ]
-法定代理人（理事長）：${data.creditorRep || ''}  [ 理事長簽章 (小章) ]
-社址：${data.creditorAddress || ''}
-電話：${data.creditorPhone || ''}
-`;
-}
-
-/**
- * 5. 產生《理監事會審議逾期放款行使股金抵銷權簽呈》
- */
-function generateOffsetBoardResolutionDoc(data) {
-  const roc = getRocDateHelper();
-  const principal = Number(data.principal) || 0;
-  const shareAmount = Number(data.shareAmount) || 0;
-  const dividendAmount = Number(data.dividendAmount) || 0;
-  const totalOffset = shareAmount + dividendAmount;
-
-  return `簽 於 放款業務部
-發文字號：簽字第 ${roc.rocYear}${String(roc.month).padStart(2, '0')}01 號
-日期：中華民國 ${roc.rocYear} 年 ${roc.month} 月 ${roc.day} 日
-主旨：建請 理事會審議核准就社員【${data.debtorName || '○○○'}】逾期未償借款行使股金抵銷權案，請 鑒核。
-
-說明：
-一、社員【${data.debtorName || '○○○'}】（社員編號：${data.debtorMemberNo || '○○○○'}）於 ${rocDateOrBlankHelper(data.loanDate)} 向本社借款新臺幣 ${numberOrBlankHelper(Number(data.loanAmount) || principal)} 元，自 ${rocDateOrBlankHelper(data.lastPaymentDate)} 起未依約攤還，累計逾期已逾 ${overdueMonthsHelper(data.lastPaymentDate)} 個月。
-二、該員目前尚欠未償本金${chineseMoneyOrBlankHelper(principal)}（${numberOrBlankHelper(principal)}元）及利息。經專職人員多次電話催繳、發函催告均未獲具體清償方案。
-三、查該員於本社尚有留存股金新臺幣 ${shareAmount.toLocaleString()} 元及未領股息 ${dividendAmount.toLocaleString()} 元，合計新臺幣 ${totalOffset.toLocaleString()} 元。
-四、依本社章程第 ${bylawArticleHelper(data.bylawArticle)} 條規定，為保全本社債權及維護全體社員利益，擬以其股金全額抵銷借款本息，並發函正式通知該員。
-
-辦法：
-奉 核可後，由專職人員辦理傳票會計帳務抵銷沖轉，並寄發《股金抵銷通知書》予借款人及連帶保證人。
-
-擬辦：
-請 理事會審議核決。
-
-承辦專職：${data.agentName || '○○○'} [簽名]      放款委員會召集人： [簽名]          理事長：${data.creditorRep || '○○○'} [蓋章]
-`;
-}
-
-/**
- * 6. 郵局存證信函（清償債務催告）— 內容沿用附件〈存證信函（清償債務）〉原文
+ * 4. 郵局存證信函（清償債務催告）— 內容沿用附件〈存證信函（清償債務）〉原文
  * 寄件人／收件人／副本收件人依郵局存證信函用紙欄位；「內容：」以下為每格一字之正文
  */
 function postalLetterHeader(data, title) {
@@ -744,7 +654,7 @@ function postalLetterHeader(data, title) {
   return `${title}
 
 一、寄件人
-姓名：${data.creditorName || '有限責任○○儲蓄互助社'}　法定代理人：${data.creditorRep || '○○○'}  [ 蓋社圖記 (大章) ]
+姓名：${data.creditorName || '○○縣○○儲蓄互助社'}　法定代理人：${data.creditorRep || '○○○'}  [ 蓋社圖記 (大章) ]
 詳細地址：${data.creditorAddress || ''}
 
 二、收件人
@@ -762,7 +672,7 @@ function generateDemandLetterDoc(data) {
 }
 
 /**
- * 7. 郵局存證信函（股金扣除貸款）— 內容沿用附件〈存證信函（股金扣除貸款）〉原文
+ * 5. 郵局存證信函（股金扣除貸款）— 內容沿用附件〈存證信函（股金扣除貸款）〉原文
  * 適用：已經法院訴訟、進入執行階段，社員仍有股金尚未扣除貸款
  */
 function generateOffsetLetterDoc(data) {
@@ -783,7 +693,5 @@ if (typeof module !== 'undefined' && module.exports) {
     collectThirdParties,
     generateExecutionDoc,
     generateRenewCertificateDoc,
-    generateOffsetShareDoc,
-    generateOffsetBoardResolutionDoc
   };
 }
