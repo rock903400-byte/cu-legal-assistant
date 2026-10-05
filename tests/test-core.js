@@ -10,8 +10,11 @@ const {
   calculate6MonthNoticeExpiry,
   calculateEstimatedInterest,
   calculateCourtFees,
-  formatRocDate
+  formatRocDate,
+  addDaysToDateStr
 } = require('../js/core-legal');
+
+const { findCourtByAddress } = require('../js/court-data');
 
 const {
   MIN_LIVING_EXPENSES_115,
@@ -123,14 +126,25 @@ const execDoc = generateExecutionDoc({
 assert.strictEqual(execDoc.includes('最高法院 108 年度台抗大字第 897 號'), true);
 assert.strictEqual(execDoc.includes('中華民國人壽保險商業同業公會'), true);
 
-// 5.3 換發憑證
+// 5.3 換發／核發憑證（依執行名義種類決定）
 const renewDoc = generateRenewCertificateDoc({
   creditorName: '有限責任臺中市第一儲蓄互助社',
   debtorName: '張大同',
   principal: 210000,
-  courtName: '臺中'
+  courtName: '臺中',
+  titleType: 'cert'
 });
 assert.strictEqual(renewDoc.includes('民事聲請換發債權憑證狀'), true);
+assert.strictEqual(renewDoc.includes('債權憑證正本一份'), true);
+const issueDoc = generateRenewCertificateDoc({
+  creditorName: '有限責任臺中市第一儲蓄互助社',
+  debtorName: '張大同',
+  principal: 210000,
+  courtName: '臺中',
+  titleType: 'payment_order'
+});
+assert.strictEqual(issueDoc.includes('民事聲請核發債權憑證狀'), true);
+assert.strictEqual(issueDoc.includes('支付命令及確定證明書正本各一份'), true);
 
 // 5.4 股金抵銷通知書 (儲互社法第 14 條)
 const offsetDoc = generateOffsetShareDoc({
@@ -232,5 +246,77 @@ foldIcsLines(longLine).split('\r\n').forEach(l => {
   assert.strictEqual(Buffer.byteLength(l, 'utf8') <= 76, true);
 });
 console.log('  ✅ CSV / ICS 逸出處理全部通過');
+
+// 10. 迴歸測試：金額／日期前綴重複、假資料、管轄法院、利息起算日
+console.log('\n10. 迴歸測試：書狀內容正確性');
+
+const fullData = {
+  creditorName: '有限責任臺中市第一儲蓄互助社', debtorName: '王小明', principal: 200000, loanAmount: 300000,
+  interestRate: 12, loanDate: '2022-01-10', lastPaymentDate: '2023-05-10', interestStartDate: '2023-05-11',
+  manualInterest: 5000, manualPenalty: 1000, shareAmount: 60000, dividendAmount: 3000, courtName: '臺中',
+  deceasedDateRoc: '113 年 1 月 10 日', targets: { bankDeposit: true, insurance: true, salary: true, taxData: true }
+};
+const allGenerators = {
+  generatePaymentOrderDoc, generateExecutionDoc, generateRenewCertificateDoc, generateOffsetShareDoc,
+  generateOffsetBoardResolutionDoc, generateHouseholdApplyDoc, generateInheritanceInquiryDoc, generateInheritanceDemandDoc
+};
+// 10.1 toChineseCurrency 已含「新臺幣」，範本不得再加一次；「民國」亦同
+Object.entries(allGenerators).forEach(([name, gen]) => {
+  [fullData, {}].forEach(data => {
+    const out = gen(data);
+    assert.strictEqual(/新臺幣\s*新臺幣/.test(out), false, `${name} 出現「新臺幣 新臺幣」`);
+    assert.strictEqual(/民國\s*民國/.test(out), false, `${name} 出現「民國 民國」`);
+    assert.strictEqual(out.includes('undefined') || out.includes('NaN'), false, `${name} 輸出含 undefined/NaN`);
+  });
+});
+
+// 10.2 欄位全空時以「○」待填，不得印出假資料或默默採用預設值
+const blankPay = generatePaymentOrderDoc({});
+['張大同', 'B123456789', '12345 號', '臺北', '臺中'].forEach(fake => {
+  assert.strictEqual(blankPay.includes(fake), false, `空白支付命令不應出現預設值「${fake}」`);
+});
+assert.strictEqual(blankPay.includes('民國 ○○ 年 ○○ 月 ○○ 日'), true);
+assert.strictEqual(blankPay.includes('臺灣 ○○ 地方法院'), true);
+assert.strictEqual(blankPay.includes('年息百分之 ○○'), true);
+assert.strictEqual(blankPay.includes('年息百分之 0 '), false);
+const blankExec = generateExecutionDoc({});
+assert.strictEqual(blankExec.includes('執行規費：新臺幣 ○○○ 元'), true);
+assert.strictEqual(blankExec.includes('未滿五千元免徵'), false);
+const blankRenew = generateRenewCertificateDoc({});
+assert.strictEqual(blankRenew.includes('○○ 年度 ○○ 字第 ○○○○ 號'), true);
+
+// 10.3 沒有保證人時不得寫「連帶」
+const noGuarantor = generatePaymentOrderDoc({ ...fullData, hasGuarantor: false });
+assert.strictEqual(noGuarantor.includes('連帶'), false);
+const withGuarantor = generatePaymentOrderDoc({ ...fullData, hasGuarantor: true, guarantorName: '李小華' });
+assert.strictEqual(withGuarantor.includes('命其連帶清償'), true);
+
+// 10.4 利息起算日：使用傳入值，未傳入時退回最後繳息日（不得固定成某個日期）
+const payA = generatePaymentOrderDoc({ ...fullData, interestStartDate: '2024-03-02' });
+assert.strictEqual(payA.includes('民國 113 年 3 月 2 日 起至清償日止'), true);
+assert.strictEqual(addDaysToDateStr('2023-11-20', 1), '2023-11-21');
+assert.strictEqual(addDaysToDateStr('2023-12-31', 1), '2024-01-01');
+assert.strictEqual(addDaysToDateStr('2024-02-28', 1), '2024-02-29');
+assert.strictEqual(addDaysToDateStr('', 1), '');
+
+// 10.5 執行名義種類與殘留的「（或…）」選項
+const execCert = generateExecutionDoc({ ...fullData, titleType: 'cert', titleCaseNo: '110 年度司執字第 1 號' });
+assert.strictEqual(execCert.includes('債權憑證正本一份'), true);
+// 執行名義與證物不得再留「（或…）」讓使用者自行刪改（薪資條款內的「（或…）」留待依附件重寫）
+const titleSection = execCert.split('執行名義：')[1].split('實施強制執行之標的')[0];
+assert.strictEqual(titleSection.includes('（或'), false);
+assert.strictEqual(titleSection.includes('債權憑證'), true);
+assert.strictEqual(generateExecutionDoc(fullData).includes('支付命令及確定證明書正本各一份'), true);
+assert.strictEqual(renewDoc.includes('（或'), false);
+assert.strictEqual(renewDoc.includes('證物名稱及件數'), true);
+
+// 10.6 管轄法院比對：「台」「臺」皆可；查無時回傳 null，不得預設臺北
+assert.strictEqual(findCourtByAddress('臺中市西區五權路 50 號').name, '臺中');
+assert.strictEqual(findCourtByAddress('台中市西區五權路 50 號').name, '臺中');
+assert.strictEqual(findCourtByAddress('台南市東區').name, '臺南');
+assert.strictEqual(findCourtByAddress('台北市大安區').name, '臺北');
+assert.strictEqual(findCourtByAddress('某某路 1 號'), null);
+assert.strictEqual(findCourtByAddress(''), null);
+console.log('  ✅ 書狀內容正確性迴歸測試通過');
 
 console.log('\n🎉 所有全面升級單元測試全數驗證通過！');

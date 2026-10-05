@@ -109,7 +109,8 @@ function foldIcsLines(content) {
 const STORAGE_KEYS = {
   RECORDS: 'cu_legal_records_v1',
   PROFILE: 'cu_profile_info_v1',
-  DRAFT_DOC: 'cu_draft_doc_form_v1',
+  // v2：舊版草稿混有「張大同」等預設假資料，不沿用
+  DRAFT_DOC: 'cu_draft_doc_form_v2',
   DRAFT_SCRIPT: 'cu_draft_script_form_v1',
   DRAFT_SALARY: 'cu_draft_salary_form_v1'
 };
@@ -238,16 +239,9 @@ function loadCuProfile() {
   try {
     if (typeof localStorage === 'undefined') return {};
     const raw = localStorage.getItem(STORAGE_KEYS.PROFILE);
-    if (!raw) {
-      return {
-        cuName: '有限責任臺中市第一儲蓄互助社',
-        cuTaxId: '04123456',
-        cuRep: '陳理事長',
-        cuAddress: '臺中市西區民生路 100 號',
-        cuPhone: '04-22223333',
-        agentName: '李專職'
-      };
-    }
+    // 尚未儲存本社資料時回傳空白，書狀上以「○」標示待填；
+    // 不可預設成示範用的假社名與統編，否則漏設定就會印出別家社的資料。
+    if (!raw) return {};
     return JSON.parse(raw);
   } catch (e) {
     return {};

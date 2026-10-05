@@ -119,7 +119,7 @@
                     <optgroup label="【一、司法訴訟與執行程序】">
                       <option value="payment_order">1. 《民事支付命令聲請狀》（民事訴訟法第 508 條）</option>
                       <option value="execution">2. 《民事強制執行聲請狀》（含扣押保險/存款/薪資）</option>
-                      <option value="renew_cert">3. 《民事聲請換發債權憑證狀》（強制執行法第 27 條）</option>
+                      <option value="renew_cert">3. 《民事聲請核發／換發債權憑證狀》（強制執行法第 27 條）</option>
                     </optgroup>
                     <optgroup label="【二、儲互社法定股金抵銷（儲互社法第 14 條）】">
                       <option value="offset_share">4. 《社員逾期放款以留存股金及股息抵銷通知書》</option>
@@ -136,15 +136,15 @@
                 <!-- 債務人基本資料 -->
                 <div class="form-group">
                   <label for="docDebtorName">借款人 / 債務人姓名 <span style="color:#DC2626;">*</span></label>
-                  <input type="text" id="docDebtorName" class="form-control" placeholder="例：王小明" value="張大同">
+                  <input type="text" id="docDebtorName" class="form-control" placeholder="例：王小明">
                 </div>
                 <div class="form-group">
                   <label for="docDebtorId">身分證字號</label>
-                  <input type="text" id="docDebtorId" class="form-control" placeholder="例：B123456789" value="B123456789">
+                  <input type="text" id="docDebtorId" class="form-control" placeholder="例：B123456789">
                 </div>
                 <div class="form-group col-span-full">
                   <label for="docDebtorAddress">戶籍住居所地址（自動比對管轄法院）</label>
-                  <input type="text" id="docDebtorAddress" class="form-control" placeholder="例：臺中市西區五權路 50 號" value="臺中市西區五權路 50 號">
+                  <input type="text" id="docDebtorAddress" class="form-control" placeholder="例：臺中市西區五權路 50 號">
                   <div class="field-tip-box">
                     💡 實務小抄：輸入縣市路名後，系統會自動在下方帶出對應的「管轄地方法院」。
                   </div>
@@ -201,31 +201,38 @@
               <div class="form-grid">
                 <div class="form-group">
                   <label for="docLoanDate">借款借據日期</label>
-                  <input type="date" id="docLoanDate" class="form-control" value="2023-01-15">
+                  <input type="date" id="docLoanDate" class="form-control">
                 </div>
                 <div class="form-group">
                   <label for="docLoanAmount">原始借款金額 (元)</label>
-                  <input type="number" id="docLoanAmount" class="form-control" value="300000">
+                  <input type="number" id="docLoanAmount" class="form-control" placeholder="例：300000">
                 </div>
                 <div class="form-group">
                   <label for="docPrincipal">未償本金餘額 (元) <span style="color:#DC2626;">*</span></label>
-                  <input type="number" id="docPrincipal" class="form-control" value="210000">
+                  <input type="number" id="docPrincipal" class="form-control" placeholder="例：210000">
                 </div>
                 <div class="form-group">
                   <label for="docInterestRate">
                     約定年利率 (%)
                     <span id="rateWarningBadge" style="display:none; color:#DC2626; font-size:0.75rem; font-weight:800;">⚠️ 逾 16% 上限</span>
                   </label>
-                  <input type="number" step="0.1" id="docInterestRate" class="form-control" value="6.5">
+                  <input type="number" step="0.1" id="docInterestRate" class="form-control" placeholder="例：12">
                   <div class="form-hint" style="color:var(--navy-accent); margin-top:2px;">
                     💡 民法第 205 條上限 16%；互助社放款規章通常以年息 12%（月息 1%）為限。
                   </div>
                 </div>
                 <div class="form-group">
                   <label for="docLastPaymentDate">最後繳息日 / 起算日</label>
-                  <input type="date" id="docLastPaymentDate" class="form-control" value="2023-11-20">
+                  <input type="date" id="docLastPaymentDate" class="form-control">
                   <div class="field-tip-box">
                     💡 實務小抄：填寫借款人「最後一次正常繳息日」即可，利息會自次日自動起算。
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="docInterestStartDate">利息起算日（選填）</label>
+                  <input type="date" id="docInterestStartDate" class="form-control">
+                  <div class="field-tip-box">
+                    💡 留空＝最後繳息日的次日；若借據或理事會決議另有約定起算日，才需填寫。
                   </div>
                 </div>
 
@@ -248,7 +255,7 @@
                 <!-- 金額中文大寫即時提示 -->
                 <div class="form-group col-span-full" style="background:#FEF3C7; padding:10px 14px; border-radius:6px; border:1px solid #FDE68A;">
                   <div id="chineseAmountHint" style="font-weight:800; color:#78350F; font-size:0.92rem;">
-                    合計：新臺幣貳拾壹萬元整
+                    合計：零元整
                   </div>
                 </div>
               </div>
@@ -277,22 +284,22 @@
                 <div class="form-grid">
                   <div class="form-group">
                     <label for="docDebtorMemberNo">借款人社員編號</label>
-                    <input type="text" id="docDebtorMemberNo" class="form-control" placeholder="例：CU-0886" value="CU-0886">
+                    <input type="text" id="docDebtorMemberNo" class="form-control" placeholder="例：CU-0886">
                   </div>
                   <div class="form-group">
                     <label for="docShareAmount">留存股金餘額 (元)</label>
-                    <input type="number" id="docShareAmount" class="form-control" placeholder="例：50000" value="50000">
+                    <input type="number" id="docShareAmount" class="form-control" placeholder="例：50000">
                     <div class="field-tip-box">
                       💡 實務小抄：社員未清償前不得退股，逾期得以留存股金優先抵扣。
                     </div>
                   </div>
                   <div class="form-group">
                     <label for="docDividendAmount">歷年未領股息 (元)</label>
-                    <input type="number" id="docDividendAmount" class="form-control" placeholder="例：2500" value="2500">
+                    <input type="number" id="docDividendAmount" class="form-control" placeholder="例：2500">
                   </div>
                   <div class="form-group">
                     <label for="docDocNo">發文字號</label>
-                    <input type="text" id="docDocNo" class="form-control" value="中一互社催字第 115001 號">
+                    <input type="text" id="docDocNo" class="form-control" placeholder="例：中一互社催字第 115001 號">
                   </div>
                 </div>
               </div>
@@ -305,15 +312,30 @@
                 <div class="form-grid">
                   <div class="form-group">
                     <label for="docDeceasedDate">借款人死亡日期</label>
-                    <input type="date" id="docDeceasedDate" class="form-control" value="2024-01-10">
+                    <input type="date" id="docDeceasedDate" class="form-control">
                   </div>
                   <div class="form-group">
                     <label for="docHouseholdOffice">申請戶政事務所名稱</label>
-                    <input type="text" id="docHouseholdOffice" class="form-control" value="臺中市西區戶政事務所">
+                    <input type="text" id="docHouseholdOffice" class="form-control" placeholder="例：臺中市西區戶政事務所">
                   </div>
                   <div class="form-group">
                     <label for="docAgentId">經辦專職身分證字號 (戶籍申請用)</label>
-                    <input type="text" id="docAgentId" class="form-control" value="B221133445">
+                    <input type="text" id="docAgentId" class="form-control" placeholder="例：B221133445">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 執行名義種類（強制執行狀、債權憑證狀共用） -->
+              <div id="titleTypeWrap" style="display:none; margin-bottom:14px;">
+                <div class="form-group">
+                  <label for="docTitleType">📑 執行名義種類</label>
+                  <select id="docTitleType" class="form-control">
+                    <option value="payment_order">支付命令及確定證明書</option>
+                    <option value="judgment">民事判決及確定證明書</option>
+                    <option value="cert">債權憑證（換發時選此項）</option>
+                  </select>
+                  <div class="field-tip-box">
+                    💡 選「債權憑證」時，債權憑證狀會寫成「換發」並列憑證正本為證物；選支付命令或判決則寫成首次「核發」。
                   </div>
                 </div>
               </div>
@@ -368,7 +390,7 @@
                 <div class="form-grid" style="margin-top:10px;">
                   <div class="form-group">
                     <label for="docTitleCaseNo">原執行名義案號</label>
-                    <input type="text" id="docTitleCaseNo" class="form-control" placeholder="例：112 年度司促字第 12345 號" value="112 年度司促字第 12345 號">
+                    <input type="text" id="docTitleCaseNo" class="form-control" placeholder="例：112 年度司促字第 12345 號">
                     <div class="field-tip-box">
                       💡 實務小抄：手上的「支付命令確定證明書」或「前次憑證案號」。
                     </div>
@@ -388,19 +410,19 @@
                 <div class="form-grid">
                   <div class="form-group">
                     <label for="docCaseYear">年度 (民國)</label>
-                    <input type="number" id="docCaseYear" class="form-control" value="112">
+                    <input type="number" id="docCaseYear" class="form-control" placeholder="例：112">
                   </div>
                   <div class="form-group">
                     <label for="docCaseWord">字別</label>
-                    <input type="text" id="docCaseWord" class="form-control" value="司執">
+                    <input type="text" id="docCaseWord" class="form-control" placeholder="例：司執">
                   </div>
                   <div class="form-group">
                     <label for="docCaseNo">案號</label>
-                    <input type="text" id="docCaseNo" class="form-control" value="98765">
+                    <input type="text" id="docCaseNo" class="form-control" placeholder="例：98765">
                   </div>
                   <div class="form-group">
                     <label for="docCaseSection">股別</label>
-                    <input type="text" id="docCaseSection" class="form-control" value="民">
+                    <input type="text" id="docCaseSection" class="form-control" placeholder="例：忠">
                   </div>
                 </div>
               </div>
@@ -818,27 +840,27 @@
       <div class="form-grid">
         <div class="form-group col-span-full">
           <label for="profileCuName">儲蓄互助社完整法定名稱</label>
-          <input type="text" id="profileCuName" class="form-control" value="有限責任臺中市第一儲蓄互助社">
+          <input type="text" id="profileCuName" class="form-control" placeholder="例：有限責任○○儲蓄互助社">
         </div>
         <div class="form-group">
           <label for="profileCuTaxId">統一編號</label>
-          <input type="text" id="profileCuTaxId" class="form-control" value="04123456">
+          <input type="text" id="profileCuTaxId" class="form-control" placeholder="例：04123456">
         </div>
         <div class="form-group">
           <label for="profileCuRep">法定代理人 (理事長)</label>
-          <input type="text" id="profileCuRep" class="form-control" value="陳理事長">
+          <input type="text" id="profileCuRep" class="form-control" placeholder="例：○○○">
         </div>
         <div class="form-group col-span-full">
           <label for="profileCuAddress">本社設址地址</label>
-          <input type="text" id="profileCuAddress" class="form-control" value="臺中市西區民生路 100 號">
+          <input type="text" id="profileCuAddress" class="form-control" placeholder="例：臺中市西區民生路 100 號">
         </div>
         <div class="form-group">
           <label for="profileCuPhone">聯絡電話</label>
-          <input type="text" id="profileCuPhone" class="form-control" value="04-22223333">
+          <input type="text" id="profileCuPhone" class="form-control" placeholder="例：04-22223333">
         </div>
         <div class="form-group">
           <label for="profileAgentName">專職送達代收人</label>
-          <input type="text" id="profileAgentName" class="form-control" value="李專職">
+          <input type="text" id="profileAgentName" class="form-control" placeholder="例：○○○">
         </div>
       </div>
       <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:24px; padding-top:14px; border-top:1px solid var(--border);">
@@ -904,6 +926,7 @@
           <div class="form-group">
             <label for="modalIssueDate">憑證核發日期 <span style="color:#DC2626;">*</span></label>
             <input type="date" id="modalIssueDate" class="form-control" required>
+            <div class="form-hint" style="margin-top:2px;">5 年時效自此日起算：填債權憑證核發日；尚無憑證者填支付命令確定日。</div>
           </div>
           <div class="form-group">
             <label for="modalGuarantorName">連帶保證人 (選填)</label>

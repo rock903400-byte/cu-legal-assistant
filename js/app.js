@@ -242,6 +242,12 @@ function initCourtSelect() {
   if (!courtSelect || typeof TAIWAN_COURTS === 'undefined') return;
 
   courtSelect.innerHTML = '';
+  // 第一項留空：地址尚未輸入或比對不到時，書狀上顯示「○○」待填，
+  // 而不是默默印成清單第一個法院（臺北）
+  const placeholderOpt = document.createElement('option');
+  placeholderOpt.value = '';
+  placeholderOpt.textContent = '（請輸入地址自動帶入，或手動選擇）';
+  courtSelect.appendChild(placeholderOpt);
   TAIWAN_COURTS.forEach(c => {
     const opt = document.createElement('option');
     opt.value = c.name;
@@ -384,7 +390,7 @@ function initDocGenerator() {
     'docShareAmount', 'docDividendAmount', 'docDocNo',
     'docDeceasedDate', 'docHouseholdOffice',
     'targetBankDeposit', 'targetBankName', 'targetInsurance', 'targetSalary', 'targetEmployerName', 'targetTaxData', 'targetRealEstate',
-    'docTitleCaseNo', 'docTitleCourt', 'docCaseYear', 'docCaseWord', 'docCaseNo', 'docCaseSection'
+    'docTitleType', 'docTitleCaseNo', 'docTitleCourt', 'docCaseYear', 'docCaseWord', 'docCaseNo', 'docCaseSection'
   ];
 
   formInputs.forEach(id => {
@@ -477,6 +483,9 @@ function initDocGenerator() {
   }
 
   // 存入 5 年時效台帳
+  // 台帳的 5 年時效是自「債權憑證核發日」起算，書狀表單裡並沒有這個日期
+  // （舊版曾直接拿「最後繳息日」代入，算出來的到期日是錯的），
+  // 因此改為帶入已知欄位後開啟編輯視窗，由使用者填入憑證核發日再存檔。
   const saveToLedgerBtn = document.getElementById('btnSaveDocToLedger');
   if (saveToLedgerBtn) {
     saveToLedgerBtn.addEventListener('click', () => {
@@ -485,24 +494,19 @@ function initDocGenerator() {
         alert('請先填寫借款人/債務人姓名');
         return;
       }
-      const record = {
+      switchTab('tab-statute');
+      openRecordModal({
+        id: '',
         debtorName: debtorName,
         debtorId: document.getElementById('docDebtorId')?.value.trim() || '',
         principal: Number(document.getElementById('docPrincipal')?.value) || 0,
         courtName: document.getElementById('docCourt')?.value || '臺中',
-        certNo: document.getElementById('docTitleCaseNo')?.value.trim() || document.getElementById('docCaseNo')?.value.trim() || '新法催案',
-        issueDate: document.getElementById('docLastPaymentDate')?.value || todayLocalDateStr(),
+        certNo: document.getElementById('docTitleCaseNo')?.value.trim() || document.getElementById('docCaseNo')?.value.trim() || '',
+        issueDate: '',
         guarantorName: document.getElementById('docGuarantorName')?.value.trim() || '',
         note: `自公文助手建立 (${document.getElementById('docType')?.value})`
-      };
-      if (!saveRecord(record).saved) {
-        showToast('⚠️ 儲存失敗：瀏覽器儲存空間不足，請先匯出備份並清理舊案件');
-        return;
-      }
-      renderLedgerKpis();
-      renderLedgerTable();
-      showToast('🎉 已成功將案件加入 5 年消滅時效管理台帳！');
-      switchTab('tab-statute');
+      });
+      showToast('請填入「憑證核發日期」後儲存，5 年時效由該日起算');
     });
   }
 
@@ -553,6 +557,7 @@ function updateDocTypeVisibility() {
   const type = document.getElementById('docType')?.value || 'payment_order';
   const execWrap = document.getElementById('executionSpecificFields');
   const renewWrap = document.getElementById('renewCertSpecificFields');
+  const titleTypeWrap = document.getElementById('titleTypeWrap');
   const offsetWrap = document.getElementById('offsetSpecificFields');
   const deceasedWrap = document.getElementById('deceasedSpecificFields');
   const courtGroup = document.getElementById('courtSelectGroup');
@@ -563,6 +568,7 @@ function updateDocTypeVisibility() {
 
   if (execWrap) execWrap.style.display = (type === 'execution') ? 'block' : 'none';
   if (renewWrap) renewWrap.style.display = (type === 'renew_cert') ? 'block' : 'none';
+  if (titleTypeWrap) titleTypeWrap.style.display = (type === 'execution' || type === 'renew_cert') ? 'block' : 'none';
   if (offsetWrap) offsetWrap.style.display = (type === 'offset_share' || type === 'offset_board') ? 'block' : 'none';
   if (deceasedWrap) deceasedWrap.style.display = (type === 'household_apply' || type === 'inheritance_inquiry' || type === 'inheritance_demand') ? 'block' : 'none';
   if (generalHint) generalHint.style.display = hasSpecial ? 'none' : 'block';
@@ -575,65 +581,81 @@ function updateDocTypeVisibility() {
   }
 }
 
+/**
+ * 讀取表單。空白欄位一律回傳空字串，由 templates.js 以「○」標示待填。
+ * 這裡絕不可再以看似真實的預設值（假姓名、假身分證、假案號、假日期）補空，
+ * 否則漏填的欄位會悄悄印進要送法院的書狀裡。
+ */
 function getDocFormData() {
-  const debtorAddr = document.getElementById('docDebtorAddress')?.value.trim() || '';
-  let courtName = document.getElementById('docCourt')?.value || '臺中';
-  const deceasedDateVal = document.getElementById('docDeceasedDate')?.value || '2024-01-10';
+  const text = (id) => document.getElementById(id)?.value.trim() || '';
+  const raw = (id) => document.getElementById(id)?.value || '';
+
+  const courtName = raw('docCourt');
+  const deceasedDateVal = raw('docDeceasedDate');
+  const lastPaymentDate = raw('docLastPaymentDate');
+
+  // 債權人（本社）資料來自「本社資料設定」。
+  // 書狀表單上並沒有 docCreditor* 這些輸入框；舊版因為讀不到表單就套用寫死的
+  // 「臺中市第一儲蓄互助社」，導致使用者儲存的本社設定從未進入書狀。
+  const profile = loadCuProfile() || {};
 
   return {
-    docType: document.getElementById('docType')?.value || 'payment_order',
-    creditorName: document.getElementById('docCreditorName')?.value.trim() || '有限責任臺中市第一儲蓄互助社',
-    creditorTaxId: document.getElementById('docCreditorTaxId')?.value.trim() || '',
-    creditorRep: document.getElementById('docCreditorRep')?.value.trim() || '陳理事長',
-    creditorAddress: document.getElementById('docCreditorAddress')?.value.trim() || '臺中市西區民生路 100 號',
-    creditorPhone: document.getElementById('docCreditorPhone')?.value.trim() || '04-22223333',
-    agentName: document.getElementById('docAgentName')?.value.trim() || '',
-    agentId: document.getElementById('docAgentId')?.value.trim() || '',
+    docType: raw('docType') || 'payment_order',
+    creditorName: (profile.cuName || '').trim(),
+    creditorTaxId: (profile.cuTaxId || '').trim(),
+    creditorRep: (profile.cuRep || '').trim(),
+    creditorAddress: (profile.cuAddress || '').trim(),
+    creditorPhone: (profile.cuPhone || '').trim(),
+    agentName: (profile.agentName || '').trim(),
+    agentId: text('docAgentId'),
 
-    debtorName: document.getElementById('docDebtorName')?.value.trim() || '張大同',
-    debtorId: document.getElementById('docDebtorId')?.value.trim() || 'B123456789',
-    debtorAddress: debtorAddr || '臺中市西區五權路 50 號',
-    debtorMemberNo: document.getElementById('docDebtorMemberNo')?.value.trim() || 'CU-0886',
+    debtorName: text('docDebtorName'),
+    debtorId: text('docDebtorId'),
+    debtorAddress: text('docDebtorAddress'),
+    debtorMemberNo: text('docDebtorMemberNo'),
 
     hasGuarantor: document.getElementById('docHasGuarantor')?.checked || false,
-    guarantorName: document.getElementById('docGuarantorName')?.value.trim() || '',
-    guarantorId: document.getElementById('docGuarantorId')?.value.trim() || '',
-    guarantorAddress: document.getElementById('docGuarantorAddress')?.value.trim() || '',
+    guarantorName: text('docGuarantorName'),
+    guarantorId: text('docGuarantorId'),
+    guarantorAddress: text('docGuarantorAddress'),
 
-    loanDate: document.getElementById('docLoanDate')?.value || '2023-01-15',
-    loanAmount: document.getElementById('docLoanAmount')?.value || 300000,
-    principal: document.getElementById('docPrincipal')?.value || 210000,
-    interestRate: document.getElementById('docInterestRate')?.value || 6.5,
-    lastPaymentDate: document.getElementById('docLastPaymentDate')?.value || '2023-11-20',
-    interestStartDate: document.getElementById('docInterestStartDate')?.value || '2023-11-21',
-    manualInterest: document.getElementById('docManualInterest')?.value || 0,
-    manualPenalty: document.getElementById('docManualPenalty')?.value || 0,
+    loanDate: raw('docLoanDate'),
+    loanAmount: raw('docLoanAmount'),
+    principal: raw('docPrincipal'),
+    interestRate: raw('docInterestRate'),
+    lastPaymentDate: lastPaymentDate,
+    // 未另填利息起算日時，依表單說明「自最後繳息日次日起算」
+    interestStartDate: raw('docInterestStartDate') || addDaysToDateStr(lastPaymentDate, 1),
+    manualInterest: raw('docManualInterest') || 0,
+    manualPenalty: raw('docManualPenalty') || 0,
     courtName: courtName,
 
-    shareAmount: document.getElementById('docShareAmount')?.value || 50000,
-    dividendAmount: document.getElementById('docDividendAmount')?.value || 2500,
-    docNo: document.getElementById('docDocNo')?.value.trim() || '中一互社催字第 115001 號',
+    shareAmount: raw('docShareAmount'),
+    dividendAmount: raw('docDividendAmount'),
+    docNo: text('docDocNo'),
 
     deceasedDate: deceasedDateVal,
-    deceasedDateRoc: formatRocDate(deceasedDateVal),
-    householdOffice: document.getElementById('docHouseholdOffice')?.value.trim() || '臺中市西區戶政事務所',
+    // 範本在前面已寫「民國」，這裡的值不可再帶「民國」前綴
+    deceasedDateRoc: deceasedDateVal ? formatRocDate(deceasedDateVal).replace(/^民國\s*/, '') : '',
+    householdOffice: text('docHouseholdOffice'),
 
     targets: {
       bankDeposit: document.getElementById('targetBankDeposit')?.checked ?? true,
-      bankName: document.getElementById('targetBankName')?.value.trim() || '',
+      bankName: text('targetBankName'),
       insurance: document.getElementById('targetInsurance')?.checked ?? true,
       salary: document.getElementById('targetSalary')?.checked ?? true,
-      employerName: document.getElementById('targetEmployerName')?.value.trim() || '',
+      employerName: text('targetEmployerName'),
       taxData: document.getElementById('targetTaxData')?.checked ?? true,
       realEstate: document.getElementById('targetRealEstate')?.checked ?? false
     },
 
-    titleCourt: document.getElementById('docTitleCourt')?.value.trim() || courtName,
-    titleCaseNo: document.getElementById('docTitleCaseNo')?.value.trim() || '112 年度司促字第 12345 號',
-    caseYear: document.getElementById('docCaseYear')?.value.trim() || (new Date().getFullYear() - 1911),
-    caseWord: document.getElementById('docCaseWord')?.value.trim() || '司執',
-    caseNo: document.getElementById('docCaseNo')?.value.trim() || '98765',
-    caseSection: document.getElementById('docCaseSection')?.value.trim() || '民'
+    titleType: raw('docTitleType') || 'payment_order',
+    titleCourt: text('docTitleCourt') || courtName,
+    titleCaseNo: text('docTitleCaseNo'),
+    caseYear: text('docCaseYear'),
+    caseWord: text('docCaseWord'),
+    caseNo: text('docCaseNo'),
+    caseSection: text('docCaseSection')
   };
 }
 
@@ -1093,6 +1115,7 @@ function triggerRenewDoc(id) {
   if (!r) return;
 
   if (document.getElementById('docType')) document.getElementById('docType').value = 'renew_cert';
+  if (document.getElementById('docTitleType')) document.getElementById('docTitleType').value = 'cert';
   if (document.getElementById('docDebtorName')) document.getElementById('docDebtorName').value = r.debtorName || '';
   if (document.getElementById('docDebtorId')) document.getElementById('docDebtorId').value = r.debtorId || '';
   if (document.getElementById('docPrincipal')) document.getElementById('docPrincipal').value = r.principal || 0;
@@ -1187,6 +1210,25 @@ function initDemoDataButton() {
     if (document.getElementById('scriptOverdueMonths')) document.getElementById('scriptOverdueMonths').value = 2;
     if (document.getElementById('scriptOverdueAmount')) document.getElementById('scriptOverdueAmount').value = 36000;
 
+    // 案號類欄位已不再預填（避免假資料混入真實書狀），示範時由此帶入
+    // （本社資料來自「本社資料設定」，示範不改動，以免覆蓋使用者已儲存的設定）
+    const demoFields = {
+      docAgentId: 'B221133445',
+      docInterestStartDate: '',
+      docTitleCaseNo: '112 年度司促字第 12345 號',
+      docCaseYear: '112',
+      docCaseWord: '司執',
+      docCaseNo: '98765',
+      docCaseSection: '民',
+      docDocNo: '中一互社催字第 115001 號',
+      docDeceasedDate: '2024-01-10',
+      docHouseholdOffice: '臺中市西區戶政事務所'
+    };
+    Object.entries(demoFields).forEach(([id, v]) => {
+      const el = document.getElementById(id);
+      if (el) el.value = v;
+    });
+
     if (document.getElementById('docDebtorName')) document.getElementById('docDebtorName').value = '林志明';
     if (document.getElementById('docDebtorId')) document.getElementById('docDebtorId').value = 'B120987654';
     if (document.getElementById('docDebtorAddress')) document.getElementById('docDebtorAddress').value = '臺中市南屯區公益路二段 60 號';
@@ -1195,7 +1237,6 @@ function initDemoDataButton() {
     if (document.getElementById('docPrincipal')) document.getElementById('docPrincipal').value = 320000;
     if (document.getElementById('docInterestRate')) document.getElementById('docInterestRate').value = 6.0;
     if (document.getElementById('docLastPaymentDate')) document.getElementById('docLastPaymentDate').value = '2023-08-10';
-    if (document.getElementById('docInterestStartDate')) document.getElementById('docInterestStartDate').value = '2023-08-11';
     if (document.getElementById('docManualInterest')) document.getElementById('docManualInterest').value = 18500;
     if (document.getElementById('docManualPenalty')) document.getElementById('docManualPenalty').value = 3000;
     if (document.getElementById('docCourt')) document.getElementById('docCourt').value = '臺中';

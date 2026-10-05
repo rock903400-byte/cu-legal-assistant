@@ -96,8 +96,10 @@ assert(doc1.includes('民事支付命令聲請狀') && doc1.includes('張大同'
 const doc2 = generateExecutionDoc(testDocData);
 assert(doc2.includes('民事強制執行聲請狀') && doc2.includes('最高法院 108 年度台抗大字第 897 號') && doc2.includes('保單價值準備金'), '2. 強制執行狀正確包含人身保險大法庭裁定與存款扣押');
 
-const doc3 = generateRenewCertificateDoc(testDocData);
-assert(doc3.includes('民事聲請換發債權憑證狀') && doc3.includes('強制執行法第 27 條'), '3. 換發債權憑證狀法規與案號符合規範');
+const doc3 = generateRenewCertificateDoc({ ...testDocData, titleType: 'cert' });
+assert(doc3.includes('民事聲請換發債權憑證狀') && doc3.includes('強制執行法第 27 條') && doc3.includes('債權憑證正本一份'), '3. 換發債權憑證狀（執行名義為債權憑證）法規、案號與證物符合規範');
+const doc3b = generateRenewCertificateDoc({ ...testDocData, titleType: 'payment_order' });
+assert(doc3b.includes('民事聲請核發債權憑證狀') && doc3b.includes('支付命令及確定證明書正本各一份'), '3-2. 執行名義為支付命令時，債權憑證狀為首次「核發」');
 
 const doc4 = generateOffsetShareDoc(testDocData);
 assert(doc4.includes('儲蓄互助社法》第 14 條') && doc4.includes('抵銷權') && doc4.includes('50,000'), '4. 股金抵銷通知書正確引用儲互社法第 14 條與股金金額');
@@ -113,6 +115,9 @@ assert(doc7.includes('家事法庭') && doc7.includes('拋棄繼承') && doc7.in
 
 const doc8 = generateInheritanceDemandDoc(testDocData);
 assert(doc8.includes('全體法定繼承人') && doc8.includes('民法》第 1148 條') && doc8.includes('210,000'), '8. 致全體繼承人催告函正確引用民法第 1148 條');
+
+// 未設定本社資料時不得回傳示範用的假社名／統編
+assert(Object.keys(loadCuProfile()).length === 0, '尚未儲存本社資料時，loadCuProfile 回傳空白而非示範假資料');
 
 // 2. 驗證 115 年度全台扣薪試算與極值防呆
 console.log('\n【模組二：115 年度全台最低生活費扣薪計算機驗證】');
@@ -168,5 +173,7 @@ assert(phoneScripts.empathy.script.includes('林美華') && phoneScripts.empathy
 assert(lineMsgs.gentle.text.includes('臺中第一互助社') && lineMsgs.gentle.text.includes('24,000'), 'LINE 催繳文案社名與金額正確帶入');
 
 console.log(`\n==================================================`);
-console.log(`🎉 全端深度邏輯驗證全部完成：通過 ${passedCount} / ${totalCount} 項測試（100% 通過）！`);
+console.log(passedCount === totalCount
+  ? `🎉 全端深度邏輯驗證全部完成：通過 ${passedCount} / ${totalCount} 項測試（100% 通過）！`
+  : `❌ 全端深度邏輯驗證未全數通過：${passedCount} / ${totalCount} 項通過，請檢視上方 FAIL 項目。`);
 console.log(`==================================================\n`);

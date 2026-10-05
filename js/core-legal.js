@@ -107,6 +107,17 @@ function formatLocalDate(dateObj) {
 }
 
 /**
+ * 日期字串（YYYY-MM-DD）加減天數，回傳本地時區的 YYYY-MM-DD；輸入無效時回傳空字串
+ * 用於「利息自最後繳息日次日起算」
+ */
+function addDaysToDateStr(dateStr, days) {
+  if (!dateStr) return '';
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return formatLocalDate(new Date(y, m - 1, d + days));
+}
+
+/**
  * 依民法第 121 條第 2 項加算月份
  * 但書：最後之月無相當日者，以其月之末日為期間之末日
  * 例：8/31 加 6 個月 -> 2/28 (而非 JS 預設溢位之 3/3)
@@ -285,6 +296,7 @@ if (typeof module !== 'undefined' && module.exports) {
     formatRocDate,
     getCurrentRocDate,
     formatLocalDate,
+    addDaysToDateStr,
     addMonthsWithEomAdjust
   };
 }
