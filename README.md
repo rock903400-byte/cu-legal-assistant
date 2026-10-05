@@ -78,11 +78,41 @@ npm test                      # 核心運算單元測試（含法定期限迴歸
 node tests/test-full-e2e.js   # 全端邏輯驗證
 ```
 
-> CI 會在每次 push 與 PR 執行上述兩組測試，未通過則不進行部署（見 `.github/workflows/deploy.yml`）。
+> CI 會在每次 push 與 PR 執行上述兩組測試；測試通過後，push 到 `main` 才會部署 **GitHub Pages 鏡像站**（見 `.github/workflows/deploy.yml`）。正式站需另行手動部署，見下方「部署」。
 
 ### 4. 部署
-- **正式站**：Cloudflare Pages（[cu-legal-assistant.pages.dev](https://cu-legal-assistant.pages.dev/)），由 Cloudflare 的 Git 整合自動建置。
-- **鏡像站**：GitHub Pages，由 `.github/workflows/deploy.yml` 於測試通過後部署。
+- **正式站**：Cloudflare Pages 專案 `cu-legal-assistant`（[cu-legal-assistant.pages.dev](https://cu-legal-assistant.pages.dev/)）。它是「**直接上傳**」型專案，**沒有連結 Git，合併或推送到 `main` 不會自動部署**，必須依下方步驟手動上傳。
+- **鏡像站**：GitHub Pages（`rock903400-byte.github.io/cu-legal-assistant`），由 `.github/workflows/deploy.yml` 於測試通過後自動部署（僅 push 到 `main` 時）。
+
+#### 手動部署正式站
+
+務必**從乾淨 clone 部署**，並只上傳網站需要的檔案。不要在工作資料夾直接執行 `wrangler pages deploy .`，否則會把未版控的檔案（例如 `附件/` 內部範本）、`tests/`、`.github/` 一併公開。
+
+```bash
+# 1. 從 GitHub 取得乾淨的 main，並先跑測試
+git clone https://github.com/rock903400-byte/cu-legal-assistant.git deploy-src
+cd deploy-src
+npm test && node tests/test-full-e2e.js
+
+# 2. 只複製網站需要的檔案（index.html、css/、js/）
+mkdir ../site
+cp -r index.html css js ../site/
+
+# 3. 登入 Cloudflare（首次或登入過期時），再上傳到 Production
+npx wrangler login
+npx wrangler pages deploy ../site --project-name cu-legal-assistant --branch main --commit-hash $(git rev-parse HEAD)
+
+# 4. 部署完成後可登出
+npx wrangler logout
+```
+
+部署後建議確認：
+- 正式站的檔案與 `main` 逐字一致（例如用 `curl -sL` 取回後比對雜湊；注意 `/index.html` 會轉址到 `/`，需跟隨轉址）。
+- `npx wrangler pages deployment list --project-name cu-legal-assistant` 最新一筆為 `Production`、分支 `main`、提交編號為剛部署的版本。
+
+**還原**：Cloudflare 後台 → Workers & Pages → `cu-legal-assistant` → Deployments → 選擇先前的部署 → *Rollback to this deployment*。
+
+> **注意**：台帳、本社資料與草稿存在使用者**瀏覽器的 localStorage**，依「網址」分開保存。請勿要求同仁改用鏡像站或其他網址，否則會看到一個空的台帳。更新版本後，請同仁按一次 Ctrl+F5 重新整理；原有資料不受影響。
 
 ---
 
