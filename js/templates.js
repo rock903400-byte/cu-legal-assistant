@@ -15,6 +15,8 @@ let _formatRocDate = typeof formatRocDate !== 'undefined' ? formatRocDate : null
 let _getCurrentRocDate = typeof getCurrentRocDate !== 'undefined' ? getCurrentRocDate : null;
 let _calculateCourtFees = typeof calculateCourtFees !== 'undefined' ? calculateCourtFees : null;
 let _getMinLivingStandard = typeof getMinLivingStandard !== 'undefined' ? getMinLivingStandard : null;
+let _addDaysToDateStr = typeof addDaysToDateStr !== 'undefined' ? addDaysToDateStr : null;
+let _getCourtByName = typeof getCourtByName !== 'undefined' ? getCourtByName : null;
 
 if (typeof require !== 'undefined') {
   try {
@@ -24,12 +26,19 @@ if (typeof require !== 'undefined') {
       _formatRocDate = _formatRocDate || core.formatRocDate;
       _getCurrentRocDate = _getCurrentRocDate || core.getCurrentRocDate;
       _calculateCourtFees = _calculateCourtFees || core.calculateCourtFees;
+      _addDaysToDateStr = _addDaysToDateStr || core.addDaysToDateStr;
     }
   } catch (e) {}
   try {
     const sal = require('./salary-calc');
     if (sal) {
       _getMinLivingStandard = _getMinLivingStandard || sal.getMinLivingStandard;
+    }
+  } catch (e) {}
+  try {
+    const courts = require('./court-data');
+    if (courts) {
+      _getCourtByName = _getCourtByName || courts.getCourtByName;
     }
   } catch (e) {}
 }
@@ -71,6 +80,37 @@ function numberOrBlankHelper(num) {
 
 function textOrBlankHelper(value, placeholder = '○○') {
   return (value === undefined || value === null || String(value).trim() === '') ? placeholder : value;
+}
+
+function addDaysHelper(dateStr, days) {
+  return _addDaysToDateStr ? _addDaysToDateStr(dateStr, days) : '';
+}
+
+/** 兩個 YYYY-MM-DD 取較晚者；任一為空時回傳另一個 */
+function laterDateStrHelper(a, b) {
+  if (!a) return b || '';
+  if (!b) return a;
+  return a > b ? a : b;
+}
+
+/**
+ * 書狀抬頭的法院名稱：金門、連江為「福建 ○○ 地方法院」，其餘為「臺灣 ○○ 地方法院」
+ * 未選法院時以「○○」待填
+ */
+function courtTitleHelper(name) {
+  const court = name && _getCourtByName ? _getCourtByName(name) : null;
+  const prefix = court && court.fullName.startsWith('福建') ? '福建' : '臺灣';
+  return `${prefix} ${textOrBlankHelper(name)} 地方法院`;
+}
+
+/**
+ * 執行名義的核發法院：與本件受理法院相同時稱「鈞院」，不同時寫出核發法院全名
+ * （例如支付命令由臺中地院核發、改向彰化地院聲請執行）
+ */
+function titleIssuerHelper(data) {
+  const titleCourt = data.titleCourt || data.courtName;
+  if (!titleCourt || titleCourt === data.courtName) return '鈞院';
+  return courtTitleHelper(titleCourt).replace(/ /g, '');
 }
 
 /** 執行名義種類：決定強制執行狀的「執行名義」、證物，以及債權憑證狀是「核發」或「換發」 */
@@ -202,6 +242,10 @@ function penaltyTailHelper(ratio, startRoc) {
 
 /**
  * 「請求之標的」（支付命令）／「聲請執行之事項」（強制執行）：本金及利息、違約金、前欠利息與違約金、程序費用
+ *
+ * 前欠利息、違約金一律寫明「至某日止已計算未清償」（附件〈支付命令（利率有變動）〉寫法），
+ * 書狀上的利息、違約金自該日次日起算；不寫截止日時，同一段期間會被重複請求。
+ * 截止日未填時以「○」待填；借據約定的起算日較晚者，從其約定。
  * @param {string} costLabel 督促程序費用／執行程序費用
  */
 function buildClaimItems(data, p, costLabel) {
@@ -209,17 +253,22 @@ function buildClaimItems(data, p, costLabel) {
   const manualInterest = Number(data.manualInterest) || 0;
   const manualPenalty = Number(data.manualPenalty) || 0;
   const penaltyRatio = String(data.penaltyRatio ?? '').trim();
-  const penaltyStartRoc = data.penaltyStartDate ? rocDateOrBlankHelper(data.penaltyStartDate) : '';
-  const interestStartDateRoc = rocDateOrBlankHelper(data.interestStartDate || data.lastPaymentDate);
+
+  const hasArrears = manualInterest > 0 || manualPenalty > 0;
+  const cutoff = hasArrears ? String(data.interestCutoffDate || '') : '';
+  const dayAfterCutoff = cutoff ? addDaysHelper(cutoff, 1) : '';
+  const cutoffRoc = rocDateOrBlankHelper(cutoff);
+  const interestStartDateRoc = rocDateOrBlankHelper(laterDateStrHelper(data.interestStartDate || data.lastPaymentDate, dayAfterCutoff));
+  const penaltyStartRoc = data.penaltyStartDate ? rocDateOrBlankHelper(laterDateStrHelper(data.penaltyStartDate, dayAfterCutoff)) : '';
 
   const claims = [];
   let claim1 = `一、${p.subject}應${p.scope}${p.joint}給付債權人${chineseMoneyOrBlankHelper(principal)}（小寫：${numberOrBlankHelper(principal)} 元），及自 ${interestStartDateRoc} 起至清償日止，按年息百分之 ${textOrBlankHelper(data.interestRate)} 計算之利息${penaltyTailHelper(penaltyRatio, penaltyStartRoc)}。`;
   if (manualInterest > 0) {
-    claim1 += `\n   並給付前已積欠之約定利息${toChineseCurrencyHelper(manualInterest)}（小寫：${manualInterest.toLocaleString()} 元）。`;
+    claim1 += `\n   並給付至 ${cutoffRoc} 止已計算未清償之約定利息${toChineseCurrencyHelper(manualInterest)}（小寫：${manualInterest.toLocaleString()} 元）。`;
   }
   claims.push(claim1);
   if (manualPenalty > 0) {
-    claims.push(`二、${p.subject}應${p.scope}${p.joint}給付債權人前已積欠之約定違約金${toChineseCurrencyHelper(manualPenalty)}（小寫：${manualPenalty.toLocaleString()} 元）。`);
+    claims.push(`二、${p.subject}應${p.scope}${p.joint}給付債權人至 ${cutoffRoc} 止已計算未清償之約定違約金${toChineseCurrencyHelper(manualPenalty)}（小寫：${manualPenalty.toLocaleString()} 元）。`);
   }
   claims.push(`${manualPenalty > 0 ? '三' : '二'}、${costLabel}由${p.costSubject}負擔。`);
   return claims;
@@ -304,7 +353,7 @@ ${reasons.map((t, i) => `${CN_ORDINALS[i]}、${t}`).join('\n')}
 ${exhibits.map((e, i) => `${CN_ORDINALS[i]}、${e}`).join('\n')}
 
 謹  狀
-臺灣 ${textOrBlankHelper(data.courtName)} 地方法院 民事庭  公鑒
+${courtTitleHelper(data.courtName)} 民事庭  公鑒
 
 中  華  民  國  ${roc.rocYear}  年  ${roc.month}  月  ${roc.day}  日
 
@@ -350,7 +399,7 @@ function generatePaymentOrderFinalDoc(data) {
 二、依民事訴訟法第 521 條第 2 項、第 399 條第 1 項及第 4 項規定，聲請 貴院付與該支付命令確定證明書。
 
 此致
-臺灣 ${textOrBlankHelper(data.courtName)} 地方法院  公鑒
+${courtTitleHelper(data.courtName)}  公鑒
 
 證物名稱及件數：
 
@@ -363,10 +412,11 @@ function generatePaymentOrderFinalDoc(data) {
 
 /**
  * 固定第三人（出處：附件〈強執聲請狀-郵局存款〉〈查封扣押股票狀〉）
- * 名稱、設址、統一編號取自附件；法定代理人常有異動，不內建，由使用者查詢全國商工行政入口網後填寫
+ * 名稱、設址取自附件，統一編號依商工登記；法定代理人常有異動，不內建，由使用者查詢全國商工行政入口網後填寫
  */
 const FIXED_THIRD_PARTIES = {
-  post: { name: '中華郵政股份有限公司', address: '臺北市大安區永康里金山南路2段55號', taxId: '3741302' },
+  // 統一編號依經濟部商工登記為 03741302（附件寫 3741302，漏了開頭的 0）
+  post: { name: '中華郵政股份有限公司', address: '臺北市大安區永康里金山南路2段55號', taxId: '03741302' },
   stock: { name: '臺灣集中保管結算所股份有限公司', address: '臺北市松山區復興北路363號11樓', taxId: '23474232' }
 };
 
@@ -452,8 +502,13 @@ function generateExecutionDoc(data) {
 
   const p = resolveParties(data, '詳如執行名義');
   const t = data.targets || {};
-  const debtor = p.debtorName;
+  // 執行標的的所有人：債務人已死亡時，標的是被繼承人的遺產，不可把亡者稱為「債務人」
+  const ownerTitle = p.isDeceased ? '被繼承人' : '債務人';
+  const owner = `${ownerTitle}${p.debtorName}`;
   const claims = buildClaimItems(data, p, '執行程序費用');
+  // 股票條款引用「聲請執行之事項」的款次：有前欠違約金時為三款（費用在第三款）
+  const moneyItemsRef = claims.length > 2 ? `事項一至${CN_ORDINALS[claims.length - 2]}` : '事項一';
+  const costItemRef = `事項${CN_ORDINALS[claims.length - 1]}`;
 
   // 第三人當事人
   const thirdParties = collectThirdParties(t);
@@ -479,7 +534,7 @@ function generateExecutionDoc(data) {
   if (t.bankDeposit) {
     const banks = collectBanks(t);
     if (banks.length) {
-      banks.forEach(b => push(`請就債務人${debtor}存放於第三人${b.name}之存款，於債權人聲請執行之債權範圍內予以扣押。`));
+      banks.forEach(b => push(`請就${owner}存放於第三人${b.name}之存款，於債權人聲請執行之債權範圍內予以扣押。`));
     } else {
       push(`請准予扣押並收取債務人於金融機構之存款債權（含銀行、郵局、信用合作社、農漁會等）；或由 鈞院囑託【中華民國銀行商業同業公會全國聯合會】查調債務人之全部開戶銀行與存款帳號並予扣押。`);
     }
@@ -494,12 +549,12 @@ function generateExecutionDoc(data) {
   if (t.salary) {
     const living = getLivingStandardHelper(t.livingRegion);
     const amount = living ? living.standard1_2.toLocaleString() : '○○○';
-    push(`債務人現服務於第三人${textOrBlankHelper(t.employerName, '○○○')}處，每月領有薪資，請扣押債務人之薪水三分之一，並准將債務人對於第三人之債權自 ${rocYearMonthHelper(t.salaryStartMonth)} 起按月移轉於債權人，以資清償。\n   債權人同意保留債務人居住地每人每月最低生活費之 1.2 倍（即 ${amount} 元）供債務人維持生活，以便繼續工作清償債務，如果扣押後所餘的金額不足上開數額，債務人僅請求就「超過」該數額部分實施扣押。`);
+    push(`債務人現服務於第三人${textOrBlankHelper(t.employerName, '○○○')}處，每月領有薪資，請扣押債務人之薪水三分之一，並准將債務人對於第三人之債權自 ${rocYearMonthHelper(t.salaryStartMonth)} 起按月移轉於債權人，以資清償。\n   債權人同意保留債務人居住地每人每月最低生活費之 1.2 倍（即 ${amount} 元）供債務人維持生活，以便繼續工作清償債務，如果扣押後所餘的金額不足上開數額，債權人僅請求就「超過」該數額部分實施扣押。`);
   }
 
   // 勞保局電子閘門：查調任職投保單位（雇主不明時）
   if (t.laborInsurance) {
-    push(`今債權人發覺債務人${debtor}有薪資收入，惟查調國稅局所得資料清單查無債務人現任職的公司，請准予以勞動部勞工保險局電子閘門網路資料查明債務人任職之投保單位，並即對第三人核發執行命令，如第三人未於法定期間內異議，並請即發收取命令，若查無可供執行之財產或為職業工會、農漁會等，請 鈞院逕依職權核發債權憑證，倘查得資料非在 鈞院管轄區內請提供電子閘門資料並核發債權憑證以利債權回收。`);
+    push(`今債權人發覺${owner}有薪資收入，惟查調國稅局所得資料清單查無債務人現任職的公司，請准予以勞動部勞工保險局電子閘門網路資料查明債務人任職之投保單位，並即對第三人核發執行命令，如第三人未於法定期間內異議，並請即發收取命令，若查無可供執行之財產或為職業工會、農漁會等，請 鈞院逕依職權核發債權憑證，倘查得資料非在 鈞院管轄區內請提供電子閘門資料並核發債權憑證以利債權回收。`);
   }
 
   // 壽險解約金（最高法院 108 年度台抗大字第 897 號裁定；並依 114 年 6 月 18 日公布施行之保險法修正）
@@ -511,14 +566,14 @@ function generateExecutionDoc(data) {
 
   // 股票（集保）
   if (t.stock) {
-    push(`祈請 鈞院函囑第三人${FIXED_THIRD_PARTIES.stock.name}陳報債務人${debtor}應受保管之股票及有價證券名稱、數量、開戶之證券商等資料，並就該等股票及有價證券予以扣押及拍賣，以清償聲請執行之事項一所示債務人逾欠款，及事項二所示債務人應負擔之執行費用，且囑令不得對債務人為清償，僅得對債權人清償。`);
+    push(`祈請 鈞院函囑第三人${FIXED_THIRD_PARTIES.stock.name}陳報${owner}應受保管之股票及有價證券名稱、數量、開戶之證券商等資料，並就該等股票及有價證券予以扣押及拍賣，以清償聲請執行之${moneyItemsRef}所示債務人逾欠款，及${costItemRef}所示債務人應負擔之執行費用，且囑令不得對債務人為清償，僅得對債權人清償。`);
   }
 
   // 動產、車輛
   if (t.movables) {
     const addr = t.movablesAddress || data.debtorAddress || '○○市○○路○○號';
-    const plate = t.vehiclePlate ? `，及債務人所有車牌號碼 ${t.vehiclePlate} 之車輛一輛` : '';
-    push(`請查封、拍賣債務人${debtor}所有於門牌號碼 ${addr} 內之動產${plate}。`);
+    const plate = t.vehiclePlate ? `，及${ownerTitle}所有車牌號碼 ${t.vehiclePlate} 之車輛一輛` : '';
+    push(`請查封、拍賣${owner}所有於門牌號碼 ${addr} 內之動產${plate}。`);
   }
 
   // 國稅局查調財產及所得
@@ -530,7 +585,7 @@ function generateExecutionDoc(data) {
   if (t.realEstate) {
     const lines = String(t.realEstateList || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     const estate = lines.length ? lines : ['土地：○○縣市○○段○○小段○○地號，權利範圍：○○。', '建物：○○縣市○○段○○小段○○建號，權利範圍：○○。'];
-    push(`請求拍賣債務人${debtor}所有之不動產（詳證物${exhibitNo('land')}）：\n${estate.map(l => '    ' + l).join('\n')}\n   若於現場發現其他未保存登記之增建物、搭建物等，亦應一併查封。`);
+    push(`請求拍賣${owner}所有之不動產（詳證物${exhibitNo('land')}）：\n${estate.map(l => '    ' + l).join('\n')}\n   若於現場發現其他未保存登記之增建物、搭建物等，亦應一併查封。`);
   }
 
   if (items.length === 0) {
@@ -558,20 +613,20 @@ ${p.partySection}${thirdPartySection}
 ${claims.join('\n')}
 
 執行名義：
-臺灣 ${textOrBlankHelper(data.titleCourt || data.courtName)} 地方法院 ${titleCaseNo} ${titleType.label}。
+${courtTitleHelper(data.titleCourt || data.courtName)} ${titleCaseNo} ${titleType.label}。
 
 實施強制執行之標的及方法：
 ${items.join('\n')}
 
 事實及理由：
-一、債權人與債務人間清償借款強制執行事件，前經 鈞院核發 ${titleCaseNo} 確定之執行名義在案，債務人依法應給付債權人如執行名義所載之本金、利息、違約金及程序費用。
+一、債權人與債務人間清償借款強制執行事件，前經 ${titleIssuerHelper(data)}核發 ${titleCaseNo} 確定之執行名義在案，債務人依法應給付債權人如執行名義所載之本金、利息、違約金及程序費用。
 二、詎該執行名義確定後，債務人迄未履行清償義務，迄今尚欠本金${principalChinese}及約定利息、違約金。為此依強制執行法第 4 條、第 6 條、第 115 條等規定，檢附前開執行名義正本，狀請 鈞院民事執行處依法實施強制執行，以維債權，實感德便。
 
 證物名稱及件數：
 ${exhibits.map((e, i) => `${CN_ORDINALS[i]}、${e.text}`).join('\n')}
 
 謹  狀
-臺灣 ${textOrBlankHelper(data.courtName)} 地方法院 民事執行處  公鑒
+${courtTitleHelper(data.courtName)} 民事執行處  公鑒
 
 中  華  民  國  ${roc.rocYear}  年  ${roc.month}  月  ${roc.day}  日
 
@@ -606,7 +661,7 @@ function generateRenewCertificateDoc(data) {
     : '又目前查無可供強制執行之財產';
 
   const reasons = [];
-  reasons.push(`債權人與債務人間之債權債務關係，業經 鈞院核發 ${titleCaseNo} ${titleType.label}在案，並經 鈞院以 ${caseNoText} 受理強制執行在案。`);
+  reasons.push(`債權人與債務人間之債權債務關係，業經 ${titleIssuerHelper(data)}核發 ${titleCaseNo} ${titleType.label}在案，並經 鈞院以 ${caseNoText} 受理強制執行在案。`);
   if (p.isDeceased) {
     reasons.push(`惟原債務人 ${p.debtorName} 已於 ${rocDateOrBlankHelper(data.deceasedDate)} 死亡，於其繼承人未為相關權利主張時（詳證物二），其被繼承人之債權債務關係應由繼承人繼承，並依法應負連帶清償責任。`);
   }
@@ -633,7 +688,7 @@ ${reasons.map((t, i) => `${CN_ORDINALS[i]}、${t}`).join('\n')}
 ${exhibits.map((e, i) => `${CN_ORDINALS[i]}、${e}`).join('\n')}
 
 謹  狀
-臺灣 ${textOrBlankHelper(data.courtName)} 地方法院 民事執行處  公鑒
+${courtTitleHelper(data.courtName)} 民事執行處  公鑒
 
 中  華  民  國  ${roc.rocYear}  年  ${roc.month}  月  ${roc.day}  日
 
@@ -676,10 +731,12 @@ function generateDemandLetterDoc(data) {
 /**
  * 5. 郵局存證信函（股金扣除貸款）— 內容沿用附件〈存證信函（股金扣除貸款）〉原文
  * 適用：已經法院訴訟、進入執行階段，社員仍有股金尚未扣除貸款
+ * 協會《儲蓄互助社章程範例》第 17 條：以股金抵充須「經理事會討論通過」並以書面通知社員，
+ * 因此信函載明理事會決議日（本信函即書面通知）；未填以「○」待填
  */
 function generateOffsetLetterDoc(data) {
   const principal = Number(data.principal) || 0;
-  const body = `敬啟者　台端於${rocDateCompactHelper(data.loanDate)}向本社借貸${taiwanDollarHelper(Number(data.loanAmount) || principal)}，至今仍有本金${taiwanDollarHelper(principal)}及利息、違約金尚未清償，經法院訴訟已於執行階段，目前仍有股金尚未扣除貸款，依本社章程${bylawArticleHelper(data.bylawArticle)}條，將以股金扣除貸款後續行執行法催程序，謹此函告　台端若有異議請於函到七日內至本社處理，事涉台端權益，請惠予配合為禱，以免訟累。`;
+  const body = `敬啟者　台端於${rocDateCompactHelper(data.loanDate)}向本社借貸${taiwanDollarHelper(Number(data.loanAmount) || principal)}，至今仍有本金${taiwanDollarHelper(principal)}及利息、違約金尚未清償，經法院訴訟已於執行階段，目前仍有股金尚未扣除貸款，依本社章程${bylawArticleHelper(data.bylawArticle)}條，經本社理事會${rocDateCompactHelper(data.boardResolutionDate)}討論通過，將以股金扣除貸款後續行執行法催程序，謹此函告　台端若有異議請於函到七日內至本社處理，事涉台端權益，請惠予配合為禱，以免訟累。`;
   return postalLetterHeader(data, '郵局存證信函（股金扣除貸款）') + body + '\n';
 }
 

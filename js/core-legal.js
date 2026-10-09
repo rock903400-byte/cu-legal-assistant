@@ -96,6 +96,25 @@ function validateInterestRate(rate) {
 }
 
 /**
+ * 檢核違約金比例（按應付利息之百分之 N）是否逾協會規定
+ * 依據：中華民國儲蓄互助協會《儲蓄互助社辦理放款實施要點》第 19 條
+ * 「違約金依應付利息乘以違約利率計算，違約利率最高為百分之十五」。
+ * 借據另有約定時仍以借據為準，因此只提醒、不阻擋。
+ */
+function validatePenaltyRatio(ratio) {
+  const r = Number(ratio) || 0;
+  if (r > 15) {
+    return {
+      isValid: false,
+      ratio: r,
+      maxRatio: 15,
+      warning: `⚠️ 依協會《儲蓄互助社辦理放款實施要點》第 19 條，違約金按應付利息乘以違約利率計算，違約利率最高為百分之十五；目前輸入 ${r}%，請確認借據約定。`
+    };
+  }
+  return { isValid: true, ratio: r, maxRatio: 15, warning: '' };
+}
+
+/**
  * 將 Date 物件格式化為本地時區的 YYYY-MM-DD
  * 不可使用 toISOString()，其會以 UTC 輸出，在 UTC+8 會整天前移一日
  */
@@ -245,11 +264,13 @@ function calculate6MonthNoticeExpiry(noticeDateStr, currentDate = new Date()) {
   const diffTime = expiryDate.getTime() - todayZero.getTime();
   const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
+  // 民法第 121 條第 1 項：以期間末日之終止為期間之終止，末日當天聲請仍在期限內
   return {
     noticeDateStr,
     expiryDateStr: formatLocalDate(expiryDate),
     remainingDays,
-    isExpired: remainingDays <= 0
+    isLastDay: remainingDays === 0,
+    isExpired: remainingDays < 0
   };
 }
 
@@ -317,6 +338,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     toChineseCurrency,
     validateInterestRate,
+    validatePenaltyRatio,
     calculate5YearExpiry,
     calculate6MonthNoticeExpiry,
     calculateEstimatedInterest,

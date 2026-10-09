@@ -254,6 +254,22 @@ function initCourtSelect() {
     opt.textContent = `${c.fullName}（${c.name}）`;
     courtSelect.appendChild(opt);
   });
+
+  // 執行名義核發法院：留空＝與管轄法院相同，書狀稱「鈞院」；不同時寫出核發法院全名
+  const titleCourtSelect = document.getElementById('docTitleCourt');
+  if (titleCourtSelect) {
+    titleCourtSelect.innerHTML = '';
+    const sameOpt = document.createElement('option');
+    sameOpt.value = '';
+    sameOpt.textContent = '（與上方管轄法院相同）';
+    titleCourtSelect.appendChild(sameOpt);
+    TAIWAN_COURTS.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.name;
+      opt.textContent = c.fullName;
+      titleCourtSelect.appendChild(opt);
+    });
+  }
 }
 
 /* ==========================================================================
@@ -390,7 +406,7 @@ function initDocGenerator() {
     'docDebtorDeceased', 'docHeirs', 'docBasisType', 'docPenaltyRatio', 'docPenaltyStartDate',
     'docRateChanged', 'docOrigRate', 'docOrigPenaltyRatio', 'docRateChangeDate', 'docOrderIssueDate', 'docNoticeDate',
     'docLoanDate', 'docLoanAmount', 'docPrincipal', 'docInterestRate', 'docLastPaymentDate', 'docInterestStartDate',
-    'docManualInterest', 'docManualPenalty', 'docCourt',
+    'docManualInterest', 'docManualPenalty', 'docInterestCutoffDate', 'docCourt', 'docBoardResolutionDate',
     'docDeceasedDate',
     'targetBankDeposit', 'targetBankList', 'targetPostOffice', 'targetPostRep', 'targetSalary', 'targetEmployerName',
     'targetEmployerAddress', 'targetEmployerRep', 'targetSalaryStartMonth', 'docLivingRegion', 'targetLaborInsurance',
@@ -405,12 +421,14 @@ function initDocGenerator() {
       el.addEventListener('input', () => {
         handleAddressAutoCourt(id);
         validateInterestRateInput();
+        validatePenaltyRatioInput();
         updateDocPreview();
         saveDocDraft();
       });
       el.addEventListener('change', () => {
         handleAddressAutoCourt(id);
         validateInterestRateInput();
+        validatePenaltyRatioInput();
         updateDocTypeVisibility();
         updateDocPreview();
         saveDocDraft();
@@ -428,22 +446,31 @@ function initDocGenerator() {
     });
   }
 
-  // 輔助試算按鈕
+  // 輔助試算按鈕：試算「利息起算日～今天」的積欠利息，並把「計算至」填為今天，
+  // 書狀上的利息因此改自明天起算（舊版只填金額、起算日不動，同一段期間會被重複請求）
   const calcInterestBtn = document.getElementById('btnEstimateInterest');
   if (calcInterestBtn) {
     calcInterestBtn.addEventListener('click', () => {
       const p = Number(document.getElementById('docPrincipal')?.value) || 0;
       const r = Number(document.getElementById('docInterestRate')?.value) || 0;
-      const start = document.getElementById('docInterestStartDate')?.value || document.getElementById('docLastPaymentDate')?.value;
-      const end = todayLocalDateStr();
+      // 與書狀相同的起算日：另填的利息起算日，否則為最後繳息日的次日
+      const start = document.getElementById('docInterestStartDate')?.value
+        || addDaysToDateStr(document.getElementById('docLastPaymentDate')?.value, 1);
+      const cutoff = todayLocalDateStr();
       if (p > 0 && r > 0 && start) {
-        const est = calculateEstimatedInterest(p, r, start, end);
+        if (start > cutoff) {
+          alert('利息起算日在今天之後，目前沒有積欠利息可試算');
+          return;
+        }
+        // 計息天數含起算日與截止日當天
+        const est = calculateEstimatedInterest(p, r, start, addDaysToDateStr(cutoff, 1));
         document.getElementById('docManualInterest').value = est.interest;
-        showToast(`💡 已為您試算 ${est.days} 天之約定利息：${est.interest.toLocaleString()} 元`);
+        document.getElementById('docInterestCutoffDate').value = cutoff;
+        showToast(`💡 已試算 ${start} 至 ${cutoff} 共 ${est.days} 天利息 ${est.interest.toLocaleString()} 元；書狀利息改自 ${addDaysToDateStr(cutoff, 1)} 起算`);
         updateDocPreview();
         saveDocDraft();
       } else {
-        alert('請先填寫未償本金、約定年利率與利息起算日');
+        alert('請先填寫未償本金、約定年利率與最後繳息日（或利息起算日）');
       }
     });
   }
@@ -558,6 +585,16 @@ function validateInterestRateInput() {
   }
 }
 
+/** 違約金比例逾協會《儲蓄互助社辦理放款實施要點》第 19 條上限 15% 時提醒（借據另有約定者以借據為準，不阻擋） */
+function validatePenaltyRatioInput() {
+  const input = document.getElementById('docPenaltyRatio');
+  const alertBox = document.getElementById('penaltyAlertBox');
+  if (!input || !alertBox) return;
+  const res = validatePenaltyRatio(input.value);
+  alertBox.textContent = res.warning;
+  alertBox.style.display = res.isValid ? 'none' : 'block';
+}
+
 function saveDocDraft() {
   const data = getDocFormData();
   saveDraft(STORAGE_KEYS.DRAFT_DOC, data);
@@ -598,6 +635,7 @@ function updateDocTypeVisibility() {
   show('titleCaseNoWrap', isExec || isFinal || isRenew);
   show('orderIssueWrap', isFinal);
   show('letterSpecificFields', isLetter);
+  show('boardResolutionWrap', type === 'offset_letter');
 
   // 支付命令專屬（債權憑據、違約金比例、利率變動）
   show('paymentOnlyFields', isPayment);
@@ -676,6 +714,8 @@ function getDocFormData() {
     interestStartDate: raw('docInterestStartDate') || addDaysToDateStr(lastPaymentDate, 1),
     manualInterest: raw('docManualInterest') || 0,
     manualPenalty: raw('docManualPenalty') || 0,
+    // 積欠利息、違約金計算至哪一天；書狀上的利息、違約金自次日起算
+    interestCutoffDate: raw('docInterestCutoffDate'),
     basisType: raw('docBasisType') || 'loan',
     penaltyRatio: raw('docPenaltyRatio'),
     penaltyStartDate: raw('docPenaltyStartDate'),
@@ -685,6 +725,7 @@ function getDocFormData() {
     rateChangeDate: raw('docRateChangeDate'),
     orderIssueDate: raw('docOrderIssueDate'),
     noticeDate: raw('docNoticeDate'),
+    boardResolutionDate: raw('docBoardResolutionDate'),
     courtName: courtName,
 
 
@@ -799,6 +840,10 @@ function updateLetterAids(data, text) {
     } else if (info.isExpired) {
       box.className = 'alert-box danger';
       box.textContent = `⚠️ 自 ${data.noticeDate} 送達起算，6 個月期限已於 ${info.expiryDateStr} 屆滿；若未於期限內聲請支付命令或起訴，此次催告對時效的中斷視為不中斷。`;
+    } else if (info.isLastDay) {
+      // 民法第 121 條：期間以末日之終止為終止，末日當天聲請仍在期限內
+      box.className = 'alert-box danger';
+      box.textContent = `⚠️ 今天（${info.expiryDateStr}）是 6 個月期限的最後一天，請於今日聲請支付命令或起訴；逾期未起訴，此次催告對時效的中斷視為不中斷（民法第 130 條）。`;
     } else {
       box.className = 'alert-box info';
       box.textContent = `⏰ 須於 ${info.expiryDateStr} 前（尚餘 ${info.remainingDays} 天）聲請支付命令或起訴；逾期未起訴，此次催告對時效的中斷視為不中斷（民法第 130 條）。`;
@@ -1319,6 +1364,7 @@ function initDemoDataButton() {
     // （本社資料來自「本社資料設定」，示範不改動，以免覆蓋使用者已儲存的設定）
     const demoFields = {
       docInterestStartDate: '',
+      docInterestCutoffDate: '2024-07-31',
       docTitleCaseNo: '112 年度司促字第 12345 號',
       docCaseYear: '112',
       docCaseWord: '司執',

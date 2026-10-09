@@ -12,7 +12,8 @@ const {
   calculateCourtFees,
   formatRocDate,
   addDaysToDateStr,
-  calcPostalLetterLayout
+  calcPostalLetterLayout,
+  validatePenaltyRatio
 } = require('../js/core-legal');
 
 const { findCourtByAddress } = require('../js/court-data');
@@ -298,7 +299,8 @@ assert.strictEqual(generateDemandLetterDoc({}).includes('民國○○年○○�
 
 // 11.2 存證信函（股金扣除貸款）：含章程條次，條次未填時以「○○」待填
 const letter2 = generateOffsetLetterDoc(batch2);
-assert.strictEqual(letter2.includes('經法院訴訟已於執行階段，目前仍有股金尚未扣除貸款，依本社章程十七條，將以股金扣除貸款後續行執行法催程序，謹此函告　台端若有異議請於函到七日內至本社處理'), true);
+// 協會《儲蓄互助社章程範例》第 17 條：股金抵充須經理事會討論通過，信函載明決議日（未填以「○」待填）
+assert.strictEqual(letter2.includes('經法院訴訟已於執行階段，目前仍有股金尚未扣除貸款，依本社章程十七條，經本社理事會民國○○年○○月○○日討論通過，將以股金扣除貸款後續行執行法催程序，謹此函告　台端若有異議請於函到七日內至本社處理'), true);
 assert.strictEqual(generateOffsetLetterDoc({ ...batch2, bylawArticle: '十七' }).includes('本社章程十七條'), true);
 assert.strictEqual(generateOffsetLetterDoc({ ...batch2, bylawArticle: '' }).includes('本社章程○○條'), true);
 assert.strictEqual(letter2.includes('儲蓄互助社法'), false);
@@ -422,7 +424,7 @@ assert.strictEqual(exec1.includes('三、執行程序費用由債務人等連帶
 assert.strictEqual(exec1.includes('第三人：宏達企業社\n設址：臺中市北區某路 2 號\n法定代理人：雇主代理人'), true);
 assert.strictEqual(exec1.includes('第三人：合作金庫商業銀行臺中分行\n設址：臺中市西區某路 1 號'), true);
 assert.strictEqual(exec1.includes('第三人：玉山銀行臺中分行'), true);
-assert.strictEqual(exec1.includes('第三人：中華郵政股份有限公司\n統一編號：3741302'), true);
+assert.strictEqual(exec1.includes('第三人：中華郵政股份有限公司\n統一編號：03741302'), true); // 附件漏了開頭的 0，依商工登記
 assert.strictEqual(exec1.includes('法定代理人：郵政代理人'), true);
 assert.strictEqual(exec1.includes('第三人：臺灣集中保管結算所股份有限公司\n統一編號：23474232'), true);
 assert.strictEqual(exec1.includes('游芳來') || exec1.includes('林修銘'), false);
@@ -433,7 +435,7 @@ assert.strictEqual(execNoRep.includes('第三人：宏達'), false);
 // 12.4 薪資：扣 1/3、按月移轉、保留 1.2 倍（金額自動帶入）、起扣月份
 assert.strictEqual(exec1.includes('債務人現服務於第三人宏達企業社處，每月領有薪資，請扣押債務人之薪水三分之一，並准將債務人對於第三人之債權自 115 年 11 月份 起按月移轉於債權人，以資清償。'), true);
 assert.strictEqual(exec1.includes('債權人同意保留債務人居住地每人每月最低生活費之 1.2 倍（即 19,717 元）供債務人維持生活'), true);
-assert.strictEqual(exec1.includes('債務人僅請求就「超過」該數額部分實施扣押'), true);
+assert.strictEqual(exec1.includes('債權人僅請求就「超過」該數額部分實施扣押'), true); // 附件寫「債務人」是筆誤：請求扣押的是債權人
 const execSalaryBlank = generateExecutionDoc({ ...batch2, targets: { salary: true } });
 assert.strictEqual(execSalaryBlank.includes('自 ○○ 年 ○ 月份 起'), true);
 assert.strictEqual(execSalaryBlank.includes('（即 ○○○ 元）'), true); // 區域未知時不得猜金額
@@ -566,5 +568,142 @@ assert.strictEqual(noIns.includes('保險'), false);
 assert.strictEqual(noIns.includes('台抗大字第 897 號'), false);
 assert.strictEqual(insDoc.includes('最高法院 108 年度台抗大字第 897 號民事大法庭裁定要旨一份'), true); // 證物仍列
 console.log('  ✅ 壽險解約金措辭測試通過');
+
+// 16. 2026-10-10 全面 review 與《法規彙編》核對後的修正
+// 逐條收集失敗項目再一次回報，方便確認每一條在修正前的程式上都會失敗
+console.log('\n16. Review 與協會法規彙編核對後的修正');
+const reviewFailures = [];
+const check = (desc, fn) => {
+  try {
+    if (!fn()) reviewFailures.push(desc);
+  } catch (e) {
+    reviewFailures.push(`${desc}（${e.message}）`);
+  }
+};
+const rv = {
+  creditorName: '○○縣○○儲蓄互助社', debtorName: '王小明', debtorAddress: '臺中市西區五權路 50 號',
+  principal: 100000, loanAmount: 150000, interestRate: '10', lastPaymentDate: '2024-12-31', interestStartDate: '2025-01-01',
+  manualInterest: 17726, manualPenalty: 3000, courtName: '臺中', titleCaseNo: '114 年度司促字第 1 號'
+};
+const lineOf = (doc, keyword) => doc.split('\n').find(l => l.includes(keyword)) || '';
+
+// 16.1 前欠利息、違約金寫明計算截止日，書狀利息自次日起算，不得同一期間重複請求
+const cut = generatePaymentOrderDoc({ ...rv, interestCutoffDate: '2026-10-10' });
+check('前欠利息寫明「至某日止已計算未清償」', () => cut.includes('並給付至 民國 115 年 10 月 10 日 止已計算未清償之約定利息新臺幣壹萬柒仟柒佰貳拾陸元整（小寫：17,726 元）'));
+check('前欠利息算至截止日時，書狀利息改自次日起算', () => cut.includes('及自 民國 115 年 10 月 11 日 起至清償日止，按年息百分之 10 計算之利息'));
+check('前欠利息算至截止日時，不得再從原起算日請求利息', () => !cut.includes('自 民國 114 年 1 月 1 日 起至清償日止'));
+check('前欠違約金同樣寫明截止日', () => cut.includes('二、債務人應給付債權人至 民國 115 年 10 月 10 日 止已計算未清償之約定違約金新臺幣參仟元整（小寫：3,000 元）'));
+check('不再使用沒有期間的「前已積欠」', () => !cut.includes('前已積欠'));
+check('另訂的違約金起算日早於截止日時，改自截止日次日起算', () =>
+  generatePaymentOrderDoc({ ...rv, penaltyRatio: '10', penaltyStartDate: '2025-02-01', interestCutoffDate: '2026-10-10' })
+    .includes('並自 民國 115 年 10 月 11 日 起至清償日止，按上開利息百分之 10 計算之違約金'));
+check('借據約定的起算日晚於截止日次日時，從其約定', () =>
+  generatePaymentOrderDoc({ ...rv, interestStartDate: '2027-01-01', interestCutoffDate: '2026-10-10' }).includes('及自 民國 116 年 1 月 1 日 起至清償日止'));
+check('有前欠利息但未填截止日時以「○」待填', () =>
+  generatePaymentOrderDoc(rv).includes('並給付至 民國 ○○ 年 ○○ 月 ○○ 日 止已計算未清償之約定利息'));
+check('沒有前欠利息、違約金時不受截止日影響', () =>
+  generatePaymentOrderDoc({ ...rv, manualInterest: 0, manualPenalty: 0, interestCutoffDate: '2026-10-10' }).includes('及自 民國 114 年 1 月 1 日 起至清償日止'));
+check('強制執行狀同樣適用截止日', () =>
+  generateExecutionDoc({ ...rv, interestCutoffDate: '2026-10-10', targets: {} }).includes('並給付至 民國 115 年 10 月 10 日 止已計算未清償之約定利息'));
+// 依日試算（app.js）以「利息起算日～截止日」含頭含尾計息：起算日至截止日次日的日數
+check('依日試算的天數含起算日與截止日', () => calculateEstimatedInterest(100000, 10, '2025-01-01', addDaysToDateStr('2026-10-10', 1)).days === 648);
+
+// 16.2 股票條款引用的「聲請執行之事項」款次須與實際款數一致
+const stockWithPenalty = lineOf(generateExecutionDoc({ ...rv, targets: { stock: true } }), '臺灣集中保管結算所股份有限公司陳報');
+check('有前欠違約金時，費用在事項三', () => stockWithPenalty.includes('以清償聲請執行之事項一至二所示債務人逾欠款，及事項三所示債務人應負擔之執行費用'));
+const stockNoPenalty = lineOf(generateExecutionDoc({ ...rv, manualPenalty: 0, targets: { stock: true } }), '臺灣集中保管結算所股份有限公司陳報');
+check('沒有前欠違約金時，費用在事項二', () => stockNoPenalty.includes('以清償聲請執行之事項一所示債務人逾欠款，及事項二所示債務人應負擔之執行費用'));
+
+// 16.3 執行名義由其他法院核發時，寫出核發法院全名，不得稱「鈞院」
+const otherCourt = generateExecutionDoc({ ...rv, courtName: '彰化', titleCourt: '臺中', targets: { bankDeposit: true } });
+check('執行名義列核發法院', () => otherCourt.includes('執行名義：\n臺灣 臺中 地方法院 114 年度司促字第 1 號 支付命令及確定證明書。'));
+check('執行名義由他院核發時寫出法院全名', () => otherCourt.includes('前經 臺灣臺中地方法院核發 114 年度司促字第 1 號'));
+check('執行名義由他院核發時不得寫「鈞院核發」', () => !otherCourt.includes('鈞院核發'));
+check('受理法院仍為執行處所在法院', () => otherCourt.includes('臺灣 彰化 地方法院 民事執行處  公鑒'));
+const otherRenew = generateRenewCertificateDoc({ ...rv, courtName: '彰化', titleCourt: '臺中', titleType: 'cert', titleCaseNo: '110 年度司執字第 1 號' });
+check('換發債權憑證狀：憑證由他院核發時寫出法院全名', () => otherRenew.includes('業經 臺灣臺中地方法院核發 110 年度司執字第 1 號 債權憑證在案，並經 鈞院以'));
+check('同一法院時仍稱「鈞院」', () => generateExecutionDoc({ ...rv, titleCourt: '臺中', targets: {} }).includes('前經 鈞院核發'));
+
+// 16.4 法院對照：平溪屬基隆地院、林口屬新北地院、燕巢屬橋頭地院；新北 29 區、高雄 38 區都要明列
+check('新北市平溪區 → 基隆地院', () => findCourtByAddress('新北市平溪區公園街 1 號').name === '基隆');
+check('新北市林口區 → 新北地院', () => findCourtByAddress('新北市林口區文化一路 1 號').name === '新北');
+check('高雄市燕巢區 → 橋頭地院', () => findCourtByAddress('高雄市燕巢區中民路 1 號').name === '橋頭');
+const { TAIWAN_COURTS } = require('../js/court-data');
+const listedIn = (district) => TAIWAN_COURTS.filter(c => c.areas.includes(district)).map(c => c.name);
+const newTaipei = ['板橋', '三重', '中和', '永和', '新莊', '新店', '樹林', '鶯歌', '三峽', '淡水', '汐止', '瑞芳', '土城', '蘆洲', '五股',
+  '泰山', '林口', '深坑', '石碇', '坪林', '三芝', '石門', '八里', '平溪', '雙溪', '貢寮', '金山', '萬里', '烏來'];
+const kaohsiung = ['楠梓', '左營', '鼓山', '三民', '鹽埕', '前金', '新興', '苓雅', '前鎮', '旗津', '小港', '鳳山', '大寮', '鳥松', '林園',
+  '仁武', '大樹', '大社', '岡山', '路竹', '橋頭', '梓官', '彌陀', '永安', '燕巢', '田寮', '阿蓮', '茄萣', '湖內', '旗山', '美濃',
+  '內門', '杉林', '甲仙', '六龜', '茂林', '桃源', '那瑪夏'];
+check('新北市 29 區都明列於恰好一所法院', () => newTaipei.length === 29 && newTaipei.every(d => listedIn(`新北市${d}區`).length === 1));
+check('高雄市 38 區都明列於恰好一所法院（橋頭 26 區）', () => kaohsiung.length === 38 &&
+  kaohsiung.every(d => listedIn(`高雄市${d}區`).length === 1) &&
+  kaohsiung.filter(d => listedIn(`高雄市${d}區`)[0] === '橋頭').length === 26);
+
+// 16.5 金門、連江地院為「福建」地方法院
+['金門', '連江'].forEach(court => {
+  const docs = {
+    支付命令: generatePaymentOrderDoc({ ...rv, courtName: court }),
+    確定證明書: generatePaymentOrderFinalDoc({ ...rv, courtName: court }),
+    強制執行: generateExecutionDoc({ ...rv, courtName: court, targets: {} }),
+    債權憑證: generateRenewCertificateDoc({ ...rv, courtName: court })
+  };
+  Object.entries(docs).forEach(([name, doc]) => {
+    check(`${name}：${court}地院抬頭為「福建」`, () => doc.includes(`福建 ${court} 地方法院`) && !doc.includes(`臺灣 ${court}`));
+  });
+});
+check('未選法院時仍以「臺灣 ○○ 地方法院」待填', () => generatePaymentOrderDoc({}).includes('臺灣 ○○ 地方法院'));
+
+// 16.6 薪資條款：請求扣押者為債權人
+const salaryDoc = generateExecutionDoc({ ...rv, targets: { salary: true, livingRegion: 'taichung' } });
+check('薪資條款主詞為債權人', () => salaryDoc.includes('債權人僅請求就「超過」該數額部分實施扣押') && !salaryDoc.includes('債務人僅請求'));
+
+// 16.7 中華郵政統一編號 8 碼
+check('中華郵政統一編號為 03741302', () => generateExecutionDoc({ ...rv, targets: { postOffice: true } }).includes('統一編號：03741302'));
+
+// 16.8 民法第 130 條 6 個月期限：末日當天仍在期限內（民法第 121 條第 1 項）
+const lastDay = calculate6MonthNoticeExpiry('2026-04-10', new Date(2026, 9, 10));
+check('期限末日當天不算逾期', () => lastDay.expiryDateStr === '2026-10-10' && lastDay.remainingDays === 0 && lastDay.isExpired === false && lastDay.isLastDay === true);
+check('末日次日才算逾期', () => calculate6MonthNoticeExpiry('2026-04-10', new Date(2026, 9, 11)).isExpired === true);
+
+// 16.9 債務人已死亡：執行標的為被繼承人遺產，不得稱亡者為「債務人」
+const deceasedExec = generateExecutionDoc({
+  ...rv, debtorDeceased: true, heirs: '王大明｜C111111111｜臺北市',
+  targets: { bankDeposit: true, bankList: '某銀行｜臺中市', stock: true, movables: true, vehiclePlate: 'ABC-1234', realEstate: true }
+});
+check('存款：被繼承人', () => deceasedExec.includes('請就被繼承人王小明存放於第三人某銀行之存款'));
+check('股票：被繼承人', () => deceasedExec.includes('陳報被繼承人王小明應受保管之股票'));
+check('動產與車輛：被繼承人', () => deceasedExec.includes('請查封、拍賣被繼承人王小明所有於門牌號碼') && deceasedExec.includes('及被繼承人所有車牌號碼 ABC-1234'));
+check('不動產：被繼承人', () => deceasedExec.includes('請求拍賣被繼承人王小明所有之不動產'));
+check('亡者不得被稱為「債務人王小明」', () => !deceasedExec.includes('債務人王小明'));
+
+// 16.10 放款利率沒有「年息 12% 為限」的規定（協會《儲蓄互助社章程範例》第 25 條：由理事會決定）
+const reviewHtml = fs.readFileSync(require('path').join(__dirname, '../index.html'), 'utf8');
+check('移除查無依據的「年息 12% 為限」', () => !reviewHtml.includes('年息 12%（月息 1%）為限'));
+check('改依章程範例第 25 條說明', () => reviewHtml.includes('放款利率由理事會決定（協會《儲蓄互助社章程範例》第 25 條）'));
+
+// 16.11 違約利率上限 15%（協會《儲蓄互助社辦理放款實施要點》第 19 條）
+check('違約金比例 20% 提醒逾上限', () => validatePenaltyRatio(20).isValid === false && validatePenaltyRatio(20).warning.includes('第 19 條'));
+check('違約金比例 15% 不提醒', () => validatePenaltyRatio(15).isValid === true && validatePenaltyRatio('').isValid === true);
+check('輸入提示不得再以超過上限的 20% 為例', () => !reviewHtml.includes('placeholder="例：20'));
+check('違約金欄位有警示區塊', () => reviewHtml.includes('id="penaltyAlertBox"'));
+
+// 16.12 恢復《呆帳處理辦法》第 11 條引用（全名；上一輪誤當成查無依據刪除）
+const scriptsSrc = fs.readFileSync(require('path').join(__dirname, '../js/scripts.js'), 'utf8');
+const fullRuleName = '《儲蓄互助社放款評估損失準備提列及逾期放款呆帳處理辦法》第 11 條';
+check('話術分頁說明引用呆帳處理辦法第 11 條', () => reviewHtml.includes(fullRuleName));
+check('話術程式註解引用呆帳處理辦法第 11 條', () => scriptsSrc.includes(fullRuleName));
+check('話術不得再引用不存在的「放款管理辦法」「放款審議委員會」', () => !scriptsSrc.includes('放款管理辦法') && !scriptsSrc.includes('放款審議委員會'));
+
+// 16.13 股金扣除貸款存證信函：載明理事會決議日（章程範例第 17 條）
+check('股金扣除信函載明理事會決議日', () =>
+  generateOffsetLetterDoc({ ...rv, bylawArticle: '十七', boardResolutionDate: '2026-09-30' }).includes('依本社章程十七條，經本社理事會民國115年9月30日討論通過，將以股金扣除貸款後續行執行法催程序'));
+check('理事會決議日未填時以「○」待填', () => generateOffsetLetterDoc(rv).includes('經本社理事會民國○○年○○月○○日討論通過'));
+check('理事會決議日欄位只在股金扣除信函出現', () => reviewHtml.includes('id="boardResolutionWrap"') && reviewHtml.includes('id="docBoardResolutionDate"'));
+check('執行名義核發法院欄位存在', () => reviewHtml.includes('id="docTitleCourt"'));
+check('積欠利息計算至欄位存在', () => reviewHtml.includes('id="docInterestCutoffDate"'));
+
+assert.deepStrictEqual(reviewFailures, [], `Review 修正測試未通過：\n- ${reviewFailures.join('\n- ')}`);
+console.log('  ✅ Review 與法規彙編核對後的修正測試通過');
 
 console.log('\n🎉 所有全面升級單元測試全數驗證通過！');
