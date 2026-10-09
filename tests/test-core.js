@@ -706,4 +706,78 @@ check('積欠利息計算至欄位存在', () => reviewHtml.includes('id="docInt
 assert.deepStrictEqual(reviewFailures, [], `Review 修正測試未通過：\n- ${reviewFailures.join('\n- ')}`);
 console.log('  ✅ Review 與法規彙編核對後的修正測試通過');
 
+// 17. 台帳換證帶入與匯入資料 id（2026-10-10 第二次 review）
+console.log('\n17. 台帳換證帶入與匯入資料 id');
+const ledgerFailures = [];
+const check17 = (desc, fn) => {
+  try {
+    if (!fn()) ledgerFailures.push(desc);
+  } catch (e) {
+    ledgerFailures.push(`${desc}（${e.message}）`);
+  }
+};
+const storageModule = require('../js/storage');
+
+// 17.1 換證：台帳憑證號碼是執行名義案號；本次執行案號、執行名義核發法院不得沿用上一案
+const renewRecord = { debtorName: '陳美玲', debtorId: 'L298765432', certNo: '110 年度司執字第 12890 號', courtName: '彰化', principal: 150000, guarantorName: '' };
+check17('換證帶入：憑證號碼帶入執行名義案號、清空本次案號與核發法院', () => {
+  const form = storageModule.buildRenewFormFromRecord(renewRecord);
+  return form.docType === 'renew_cert' && form.docTitleType === 'cert' && form.docCourt === '彰化' &&
+    form.docTitleCaseNo === '110 年度司執字第 12890 號' && form.docTitleCourt === '' &&
+    form.docCaseYear === '' && form.docCaseWord === '' && form.docCaseNo === '' && form.docCaseSection === '';
+});
+check17('換證帶入後的書狀：憑證為執行名義，本次案號以「○」待填', () => {
+  const form = storageModule.buildRenewFormFromRecord(renewRecord);
+  const doc = generateRenewCertificateDoc({
+    debtorName: form.docDebtorName, principal: form.docPrincipal, courtName: form.docCourt,
+    titleCourt: form.docTitleCourt || form.docCourt, titleType: form.docTitleType, titleCaseNo: form.docTitleCaseNo,
+    caseYear: form.docCaseYear, caseWord: form.docCaseWord, caseNo: form.docCaseNo, caseSection: form.docCaseSection
+  });
+  return doc.includes('業經 鈞院核發 110 年度司執字第 12890 號 債權憑證在案') &&
+    doc.includes('案號：○○ 年度 ○○ 字第 ○○○○ 號') && doc.includes('臺灣 彰化 地方法院 民事執行處');
+});
+
+// 17.2 匯入缺 id 或 id 重複的備份：補發唯一 id，新增案件不得覆蓋、刪除要刪得掉
+const fakeStorage = { s: {}, getItem(k) { return Object.prototype.hasOwnProperty.call(this.s, k) ? this.s[k] : null; }, setItem(k, v) { this.s[k] = String(v); } };
+global.localStorage = fakeStorage;
+check17('匯入缺 id／重複 id 的資料後，每筆都有唯一 id', () => {
+  fakeStorage.s = {};
+  const res = storageModule.importRecordsFromJSON(JSON.stringify({ records: [
+    { debtorName: '甲', issueDate: '2022-01-01' }, { debtorName: '乙', id: 'dup', issueDate: '2022-01-01' },
+    { debtorName: '丙', id: 'dup', issueDate: '2022-01-01' }, null
+  ] }));
+  const ids = storageModule.loadRecords().map(r => r.id);
+  return res.success && res.count === 3 && ids.length === 3 && ids.every(Boolean) && new Set(ids).size === 3;
+});
+check17('匯入缺 id 的資料後新增案件，不得覆蓋原資料', () => {
+  fakeStorage.s = {};
+  storageModule.importRecordsFromJSON(JSON.stringify({ records: [{ debtorName: '甲', issueDate: '2022-01-01' }] }));
+  storageModule.saveRecord({ id: undefined, debtorName: '乙', issueDate: '2023-01-01' });
+  const names = storageModule.loadRecords().map(r => r.debtorName).sort();
+  return names.join('、') === '乙、甲';
+});
+check17('匯入缺 id 的資料可以刪除', () => {
+  fakeStorage.s = {};
+  storageModule.importRecordsFromJSON(JSON.stringify({ records: [{ debtorName: '甲', issueDate: '2022-01-01' }] }));
+  // 畫面的刪除鈕以 data-record-id 傳 id，沒有 id 時傳的是空字串
+  const id = storageModule.loadRecords()[0].id || '';
+  storageModule.deleteRecord(id);
+  return id !== '' && storageModule.loadRecords().length === 0;
+});
+check17('瀏覽器裡既有缺 id 的舊資料：載入時補發 id 並寫回，之後刪得掉', () => {
+  fakeStorage.s = { [storageModule.STORAGE_KEYS.RECORDS]: JSON.stringify([{ debtorName: '舊', issueDate: '2022-01-01' }]) };
+  const id = storageModule.loadRecords()[0].id;
+  const stored = JSON.parse(fakeStorage.s[storageModule.STORAGE_KEYS.RECORDS]);
+  storageModule.deleteRecord(id);
+  return !!id && stored[0].id === id && storageModule.loadRecords().length === 0;
+});
+check17('台帳資料格式錯誤時不得覆寫原資料', () => {
+  fakeStorage.s = { [storageModule.STORAGE_KEYS.RECORDS]: '{"x":1}' };
+  return storageModule.loadRecords().length === 0 && fakeStorage.s[storageModule.STORAGE_KEYS.RECORDS] === '{"x":1}';
+});
+delete global.localStorage;
+
+assert.deepStrictEqual(ledgerFailures, [], `台帳換證與匯入測試未通過：\n- ${ledgerFailures.join('\n- ')}`);
+console.log('  ✅ 台帳換證帶入與匯入資料 id 測試通過');
+
 console.log('\n🎉 所有全面升級單元測試全數驗證通過！');

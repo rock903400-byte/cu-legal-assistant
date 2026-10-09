@@ -1264,24 +1264,12 @@ function triggerRenewDoc(id) {
   const r = getRecord(id);
   if (!r) return;
 
-  if (document.getElementById('docType')) document.getElementById('docType').value = 'renew_cert';
-  if (document.getElementById('docTitleType')) document.getElementById('docTitleType').value = 'cert';
-  if (document.getElementById('docDebtorName')) document.getElementById('docDebtorName').value = r.debtorName || '';
-  if (document.getElementById('docDebtorId')) document.getElementById('docDebtorId').value = r.debtorId || '';
-  if (document.getElementById('docPrincipal')) document.getElementById('docPrincipal').value = r.principal || 0;
-  if (document.getElementById('docCourt')) document.getElementById('docCourt').value = r.courtName || '臺中';
-  if (document.getElementById('docGuarantorName')) document.getElementById('docGuarantorName').value = r.guarantorName || '';
-
-  if (r.certNo) {
-    const m = r.certNo.match(/(\d+)\s*年度?\s*(\S+?)\s*字第?\s*(\d+)/);
-    if (m) {
-      if (document.getElementById('docCaseYear')) document.getElementById('docCaseYear').value = m[1];
-      if (document.getElementById('docCaseWord')) document.getElementById('docCaseWord').value = m[2];
-      if (document.getElementById('docCaseNo')) document.getElementById('docCaseNo').value = m[3];
-    } else {
-      if (document.getElementById('docCaseNo')) document.getElementById('docCaseNo').value = r.certNo;
-    }
-  }
+  // 欄位對應見 storage.js 的 buildRenewFormFromRecord：憑證號碼是執行名義案號，
+  // 本次執行案號與執行名義核發法院清空，不沿用上一案的值
+  Object.entries(buildRenewFormFromRecord(r)).forEach(([fieldId, value]) => {
+    const el = document.getElementById(fieldId);
+    if (el) el.value = value;
+  });
 
   updateDocTypeVisibility();
   updateDocPreview();

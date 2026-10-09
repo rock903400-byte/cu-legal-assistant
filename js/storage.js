@@ -115,6 +115,35 @@ const STORAGE_KEYS = {
   DRAFT_SALARY: 'cu_draft_salary_form_v1'
 };
 
+function newRecordId(seq = 0) {
+  return 'rec_' + Date.now() + '_' + seq + '_' + Math.random().toString(36).substr(2, 4);
+}
+
+/**
+ * 每筆案件都要有唯一 id：編輯、刪除、換證都靠 id 找案件。
+ * 缺 id（例如匯入非本系統匯出的備份）時，新增案件會覆蓋它、刪除也刪不掉，因此補發；
+ * 重複的 id 也改發新的。非物件的資料略過。
+ * @returns {{list: Array, changed: boolean}}
+ */
+function ensureRecordIds(records) {
+  const seen = new Set();
+  let changed = false;
+  const list = (Array.isArray(records) ? records : [])
+    .filter(item => item && typeof item === 'object' && !Array.isArray(item))
+    .map((item, i) => {
+      if (item.id && !seen.has(item.id)) {
+        seen.add(item.id);
+        return item;
+      }
+      changed = true;
+      const fixed = { ...item, id: newRecordId(i) };
+      seen.add(fixed.id);
+      return fixed;
+    });
+  if (Array.isArray(records) && list.length !== records.length) changed = true;
+  return { list, changed };
+}
+
 /**
  * 載入儲存的憑證與法催台帳案件清單
  */
@@ -123,7 +152,9 @@ function loadRecords() {
     if (typeof localStorage === 'undefined') return [];
     const raw = localStorage.getItem(STORAGE_KEYS.RECORDS);
     if (!raw) return [];
-    const list = JSON.parse(raw);
+    const { list, changed } = ensureRecordIds(JSON.parse(raw));
+    // 舊資料缺 id 時補發後寫回，之後的編輯、刪除才找得到同一筆
+    if (changed) safeSetItem(STORAGE_KEYS.RECORDS, JSON.stringify(list));
     return list.map(item => {
       const expiryInfo = calculate5YearExpiryHelper(item.issueDate);
       return { ...item, ...expiryInfo };
@@ -139,7 +170,8 @@ function loadRecords() {
  */
 function saveRecord(record) {
   const list = loadRecords();
-  const index = list.findIndex(r => r.id === record.id);
+  // 沒有 id 一律視為新增，不可拿 undefined 去比對而覆蓋到別筆
+  const index = record.id ? list.findIndex(r => r.id === record.id) : -1;
   
   const expiryInfo = calculate5YearExpiryHelper(record.issueDate);
   const updatedRecord = {
@@ -151,7 +183,7 @@ function saveRecord(record) {
   if (index >= 0) {
     list[index] = updatedRecord;
   } else {
-    updatedRecord.id = 'rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+    updatedRecord.id = newRecordId();
     updatedRecord.createdAt = new Date().toISOString();
     list.unshift(updatedRecord);
   }
@@ -176,6 +208,31 @@ function deleteRecord(id) {
 function getRecord(id) {
   const list = loadRecords();
   return list.find(r => r.id === id) || null;
+}
+
+/**
+ * 台帳「換證」：把案件帶入《民事聲請換發債權憑證狀》的表單欄位（欄位 id → 值）
+ * - 台帳的憑證號碼就是本件的執行名義（原債權憑證）案號，帶入「案號（原執行名義）」
+ * - 書狀抬頭的「案號、股別」是這次聲請執行後法院分的新案號，尚未知道，一律清空以「○」待填
+ * - 執行名義核發法院清空＝與管轄法院相同；以上都不可沿用上一案留在表單的值
+ */
+function buildRenewFormFromRecord(record) {
+  const r = record || {};
+  return {
+    docType: 'renew_cert',
+    docTitleType: 'cert',
+    docDebtorName: r.debtorName || '',
+    docDebtorId: r.debtorId || '',
+    docPrincipal: r.principal || 0,
+    docCourt: r.courtName || '臺中',
+    docGuarantorName: r.guarantorName || '',
+    docTitleCourt: '',
+    docTitleCaseNo: r.certNo || '',
+    docCaseYear: '',
+    docCaseWord: '',
+    docCaseNo: '',
+    docCaseSection: ''
+  };
 }
 
 /**
@@ -490,13 +547,14 @@ function importRecordsFromJSON(jsonText) {
     if (!data.records || !Array.isArray(data.records)) {
       throw new Error('無效的備份檔案格式');
     }
-    if (!safeSetItem(STORAGE_KEYS.RECORDS, JSON.stringify(data.records))) {
+    const { list } = ensureRecordIds(data.records);
+    if (!safeSetItem(STORAGE_KEYS.RECORDS, JSON.stringify(list))) {
       return { success: false, error: '瀏覽器儲存空間不足，匯入失敗' };
     }
     if (data.profile) {
       safeSetItem(STORAGE_KEYS.PROFILE, JSON.stringify(data.profile));
     }
-    return { success: true, count: data.records.length };
+    return { success: true, count: list.length };
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -509,6 +567,8 @@ if (typeof module !== 'undefined' && module.exports) {
     saveRecord,
     deleteRecord,
     getRecord,
+    buildRenewFormFromRecord,
+    ensureRecordIds,
     getLedgerMetrics,
     saveDraft,
     loadDraft,
