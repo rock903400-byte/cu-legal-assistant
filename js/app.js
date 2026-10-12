@@ -207,8 +207,7 @@ function switchTab(tabId) {
   });
 
   if (tabId === 'tab-statute') {
-    renderLedgerKpis();
-    renderLedgerTable();
+    refreshLedgerView();
   }
 }
 
@@ -436,15 +435,7 @@ function initDocGenerator() {
     }
   });
 
-  const guarantorToggle = document.getElementById('docHasGuarantor');
-  if (guarantorToggle) {
-    guarantorToggle.addEventListener('change', () => {
-      const wrap = document.getElementById('guarantorFieldsWrap');
-      if (wrap) wrap.style.display = guarantorToggle.checked ? 'block' : 'none';
-      updateDocPreview();
-      saveDocDraft();
-    });
-  }
+  // 連帶保證人勾選框：docHasGuarantor 已在上方清單，change 時由 updateDocTypeVisibility 同步顯示欄位
 
   // 輔助試算按鈕：試算「利息起算日～今天」的積欠利息，並把「計算至」填為今天，
   // 書狀上的利息因此改自明天起算（舊版只填金額、起算日不動，同一段期間會被重複請求）
@@ -637,9 +628,15 @@ function updateDocTypeVisibility() {
   show('letterSpecificFields', isLetter);
   show('boardResolutionWrap', type === 'offset_letter');
 
-  // 支付命令專屬（債權憑據、違約金比例、利率變動）
-  show('paymentOnlyFields', isPayment);
+  // 違約金比例：支付命令與強制執行都會印進「請求之標的／聲請執行之事項」，兩者都必須看得到；
+  // 債權憑據、利率變動僅支付命令使用
+  show('claimTermsFields', isPayment || isExec);
+  show('basisTypeGroup', isPayment, 'flex');
+  show('rateChangedGroup', isPayment, 'flex');
   show('rateChangeWrap', isPayment && checked('docRateChanged'));
+
+  // 連帶保證人欄位一律跟著勾選框（換證、填入範例等程式帶入時也同步）
+  show('guarantorFieldsWrap', checked('docHasGuarantor'));
 
   // 債務人死亡：支付命令與確定證明書列繼承人；死亡日期僅支付命令需要
   show('deceasedToggleGroup', deceasedApplies);
@@ -647,7 +644,9 @@ function updateDocTypeVisibility() {
   show('deceasedSpecificFields', (isPayment || isRenew) && deceased);
 
   // 強制執行：勾選標的後才顯示該標的所需的第三人與細部欄位
-  show('targetSalaryFields', isExec && checked('targetSalary'));
+  // 債務人已死亡時薪資、勞保標的不列入書狀（見 templates.js），雇主欄位隱藏並提示
+  show('deceasedTargetHint', isExec && deceased && (checked('targetSalary') || checked('targetLaborInsurance')));
+  show('targetSalaryFields', isExec && checked('targetSalary') && !deceased);
   show('targetBankFields', isExec && checked('targetBankDeposit'));
   show('targetPostFields', isExec && checked('targetPostOffice'));
   show('targetStockFields', isExec && checked('targetStock'));
@@ -1018,9 +1017,19 @@ function renderSalaryCalculationResult(res) {
 /* ==========================================================================
    8. 5 年消滅時效鬧鐘與台帳管理 (可點擊 KPI 與動態進度條)
    ========================================================================== */
-function initLedger() {
+/**
+ * 重新繪製 KPI 與台帳表格，沿用畫面上目前的搜尋字與篩選
+ * （存檔、刪除、匯入後若一律顯示全部，下拉與 KPI 卻仍標示篩選中，會讓人誤判）
+ */
+function refreshLedgerView() {
   renderLedgerKpis();
-  renderLedgerTable();
+  const filter = document.getElementById('ledgerFilter')?.value || 'all';
+  highlightActiveKpi(filter);
+  renderLedgerTable(document.getElementById('ledgerSearch')?.value.trim() || '', filter);
+}
+
+function initLedger() {
+  refreshLedgerView();
 
   const ledgerBody = document.getElementById('ledgerTableBody');
   if (ledgerBody) {
@@ -1039,26 +1048,19 @@ function initLedger() {
 
   const searchInput = document.getElementById('ledgerSearch');
   if (searchInput) {
-    searchInput.addEventListener('input', () => {
-      renderLedgerTable(searchInput.value.trim());
-    });
+    searchInput.addEventListener('input', refreshLedgerView);
   }
 
   const filterSelect = document.getElementById('ledgerFilter');
   if (filterSelect) {
-    filterSelect.addEventListener('change', () => {
-      highlightActiveKpi(filterSelect.value);
-      renderLedgerTable(searchInput?.value.trim(), filterSelect.value);
-    });
+    filterSelect.addEventListener('change', refreshLedgerView);
   }
 
   const kpiCards = document.querySelectorAll('.kpi-card');
   kpiCards.forEach(card => {
     card.addEventListener('click', () => {
-      const filterType = card.getAttribute('data-filter') || 'all';
-      if (filterSelect) filterSelect.value = filterType;
-      highlightActiveKpi(filterType);
-      renderLedgerTable(searchInput?.value.trim(), filterType);
+      if (filterSelect) filterSelect.value = card.getAttribute('data-filter') || 'all';
+      refreshLedgerView();
     });
   });
 
@@ -1085,13 +1087,15 @@ function initLedger() {
         guarantorName: document.getElementById('modalGuarantorName').value.trim(),
         note: document.getElementById('modalNote').value.trim()
       };
-      if (!saveRecord(record).saved) {
-        showToast('⚠️ 儲存失敗：瀏覽器儲存空間不足，請先匯出備份並清理舊案件');
+      const result = saveRecord(record);
+      if (!result.saved) {
+        showToast(result.reason === 'unreadable'
+          ? '⚠️ 儲存失敗：台帳資料無法讀取，為避免覆蓋既有案件已暫停存檔'
+          : '⚠️ 儲存失敗：瀏覽器儲存空間不足，請先匯出備份並清理舊案件');
         return;
       }
       closeRecordModal();
-      renderLedgerKpis();
-      renderLedgerTable();
+      refreshLedgerView();
       showToast('✅ 債權憑證案件已儲存！');
     });
   }
@@ -1134,14 +1138,30 @@ function initLedger() {
   if (importFile) {
     importFile.addEventListener('change', (e) => {
       const file = e.target.files[0];
+      // 清空選擇，下次選同一個檔案也會觸發匯入
+      e.target.value = '';
       if (!file) return;
       const reader = new FileReader();
       reader.onload = (event) => {
-        const res = importRecordsFromJSON(event.target.result);
+        const text = event.target.result;
+        const preview = previewImportJSON(text);
+        if (!preview.success) {
+          alert('匯入失敗：' + preview.error);
+          return;
+        }
+        // 匯入是「整批取代」不是合併，必須先讓使用者確認，否則一個誤選就把現有台帳換掉
+        const currentCount = loadRecords().length;
+        if (!confirm(`匯入會以備份檔的 ${preview.count} 筆案件「取代」目前台帳的 ${currentCount} 筆（不是合併，目前的案件會被移除）。\n本社資料若已設定則保留不變。\n\n確定要匯入嗎？`)) {
+          return;
+        }
+        const res = importRecordsFromJSON(text);
         if (res.success) {
-          showToast(`🎉 成功匯入 ${res.count} 筆台帳資料！`);
-          renderLedgerKpis();
-          renderLedgerTable();
+          showToast(`🎉 成功匯入 ${res.count} 筆台帳資料！${res.profileKept ? '（本社資料已有設定，未以備份覆蓋）' : ''}`);
+          if (res.profileImported) {
+            fillProfileToForm(loadCuProfile());
+            updateDocFormFromProfile();
+          }
+          refreshLedgerView();
         } else {
           alert('匯入失敗：' + res.error);
         }
@@ -1164,7 +1184,8 @@ function highlightActiveKpi(filterType) {
 function renderLedgerKpis() {
   const metrics = getLedgerMetrics();
   if (document.getElementById('kpiTotalCount')) document.getElementById('kpiTotalCount').textContent = metrics.total;
-  if (document.getElementById('kpiTotalPrincipal')) document.getElementById('kpiTotalPrincipal').textContent = `總債權本金 NT$ ${metrics.totalPrincipal.toLocaleString()}`;
+  // 核發日未填或格式錯誤的案件不算進任何燈號，在總數卡片提示待補正
+  if (document.getElementById('kpiTotalPrincipal')) document.getElementById('kpiTotalPrincipal').textContent = `總債權本金 NT$ ${metrics.totalPrincipal.toLocaleString()}${metrics.pending ? `；${metrics.pending} 筆核發日待補正` : ''}`;
   if (document.getElementById('kpiUrgentCount')) document.getElementById('kpiUrgentCount').textContent = metrics.urgent;
   if (document.getElementById('kpiWarningCount')) document.getElementById('kpiWarningCount').textContent = metrics.warning;
   if (document.getElementById('kpiSafeCount')) document.getElementById('kpiSafeCount').textContent = metrics.safe;
@@ -1191,6 +1212,11 @@ function renderLedgerTable(query = '', filterStatus = 'all') {
 
   tbody.innerHTML = '';
 
+  if (!readStoredRecords().ok) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 28px; color: #DC2626; font-weight:700;">⚠️ 台帳資料無法讀取（可能已損毀）。為避免覆蓋既有案件，已暫停存檔；請勿清除瀏覽器資料，並聯繫系統維護者協助救回。</td></tr>`;
+    return;
+  }
+
   if (records.length === 0) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 28px; color: var(--muted);">目前尚無符合條件的債權憑證案件</td></tr>`;
     return;
@@ -1213,10 +1239,14 @@ function renderLedgerTable(query = '', filterStatus = 'all') {
       badgeClass = 'badge-dark';
       progressClass = 'expired';
     }
+    // 核發日未填或格式錯誤：算不出預警日，不可顯示成安全期或「逾期 0 天」
+    const noDate = r.status !== 'safe' && r.status !== 'warning' && r.status !== 'urgent' && r.status !== 'expired';
+    if (noDate) badgeClass = 'badge-primary';
 
     const totalDays = 1825;
     const daysLeft = Math.max(0, Number(r.remainingDays) || 0);
-    const consumedPct = Math.min(100, Math.max(0, Math.round(((totalDays - daysLeft) / totalDays) * 100)));
+    const consumedPct = noDate ? 0 : Math.min(100, Math.max(0, Math.round(((totalDays - daysLeft) / totalDays) * 100)));
+    const daysText = noDate ? '請補核發日' : (daysLeft > 0 ? `剩 ${daysLeft} 天` : `逾期 ${Math.abs(Number(r.remainingDays) || 0)} 天`);
 
     tr.innerHTML = `
       <td>
@@ -1231,7 +1261,7 @@ function renderLedgerTable(query = '', filterStatus = 'all') {
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <strong>${escapeHtml(r.expiryDateStr)}</strong>
           <span style="font-size:0.82rem; color:${escapeHtml(r.color)}; font-weight:900;">
-            ${daysLeft > 0 ? `剩 ${daysLeft} 天` : `逾期 ${Math.abs(Number(r.remainingDays) || 0)} 天`}
+            ${daysText}
           </span>
         </div>
         <div class="statute-progress-wrap" title="5 年預警期已流逝 ${consumedPct}%">
@@ -1255,6 +1285,11 @@ function renderLedgerTable(query = '', filterStatus = 'all') {
 function downloadSingleICS(id) {
   const r = getRecord(id);
   if (!r) return;
+  // 核發日未填或格式錯誤時算不出預警日，下載的會是空行事曆
+  if (!r.expiryDateStr) {
+    alert('這筆案件的憑證核發日未填或格式錯誤，算不出 5 年預警日；請先按 ✏️ 編輯補正後再下載鬧鐘。');
+    return;
+  }
   const ics = generateICSContent(r);
   downloadFile(`${r.debtorName}_5年時效鬧鐘.ics`, ics, 'text/calendar;charset=utf-8');
   showToast(`📅 已下載 ${r.debtorName} 之行事曆鬧鐘檔！`);
@@ -1264,31 +1299,59 @@ function triggerRenewDoc(id) {
   const r = getRecord(id);
   if (!r) return;
 
-  // 欄位對應見 storage.js 的 buildRenewFormFromRecord：憑證號碼是執行名義案號，
-  // 本次執行案號與執行名義核發法院清空，不沿用上一案的值
+  // 換證是改辦「台帳上的這一案」：先把公文表單全部恢復初始值，再帶入台帳資料，
+  // 上一案的地址、保證人、繼承人、利息、執行標的等一律不沿用（切換成其他公文時也不會殘留）。
+  // 欄位對應見 storage.js 的 buildRenewFormFromRecord：憑證號碼是執行名義案號，本次執行案號待法院分案後填
+  resetDocFormFields();
   Object.entries(buildRenewFormFromRecord(r)).forEach(([fieldId, value]) => {
     const el = document.getElementById(fieldId);
-    if (el) el.value = value;
+    if (!el) return;
+    if (el.type === 'checkbox') el.checked = !!value;
+    else el.value = value;
   });
 
+  validateInterestRateInput();
+  validatePenaltyRatioInput();
   updateDocTypeVisibility();
   updateDocPreview();
+  // 草稿也換成這一案，否則重新整理會還原成上一案的姓名與地址
+  saveDocDraft();
   switchTab('tab-docs');
   openNextStep('stepCard3');
   showToast(`⚖️ 已將 ${r.debtorName} 憑證資料帶入換發債權憑證狀！`);
 }
 
+/**
+ * 公文表單（法催公文分頁）所有欄位恢復成頁面初始值
+ * 換證、填入範例等「改辦另一案」的動作先清空，避免上一案的資料殘留在看不到的欄位裡被印進書狀
+ */
+function resetDocFormFields() {
+  document.querySelectorAll('#tab-docs .doc-form-pane input, #tab-docs .doc-form-pane select, #tab-docs .doc-form-pane textarea').forEach(el => {
+    if (el.type === 'checkbox' || el.type === 'radio') {
+      el.checked = el.defaultChecked;
+    } else if (el.tagName === 'SELECT') {
+      const def = Array.from(el.options).find(o => o.defaultSelected) || el.options[0];
+      el.value = def ? def.value : '';
+    } else {
+      el.value = el.defaultValue;
+    }
+  });
+}
+
 function openRecordModal(record = null) {
   const modal = document.getElementById('recordModal');
   if (!modal) return;
-  
-  document.getElementById('modalRecordId').value = record ? record.id : '';
-  document.getElementById('modalDebtorName').value = record ? record.debtorName : '';
-  document.getElementById('modalDebtorId').value = record ? record.debtorId : '';
-  document.getElementById('modalCertNo').value = record ? record.certNo : '';
-  document.getElementById('modalCourtName').value = record ? record.courtName : '臺中';
-  document.getElementById('modalPrincipal').value = record ? record.principal : '';
-  document.getElementById('modalIssueDate').value = record ? record.issueDate : todayLocalDateStr();
+
+  // 匯入的備份可能缺欄位：缺值一律顯示空白，不可讓 input 顯示並存回 "undefined"
+  const field = (key) => (record && record[key] !== undefined && record[key] !== null) ? record[key] : '';
+  document.getElementById('modalRecordId').value = field('id');
+  document.getElementById('modalDebtorName').value = field('debtorName');
+  document.getElementById('modalDebtorId').value = field('debtorId');
+  document.getElementById('modalCertNo').value = field('certNo');
+  document.getElementById('modalCourtName').value = record ? (record.courtName || '臺中') : '臺中';
+  document.getElementById('modalPrincipal').value = field('principal');
+  // 核發日不預填今天：5 年預警日由此起算，忘了改會讓預警延後，空白則必須填寫才能存檔
+  document.getElementById('modalIssueDate').value = field('issueDate');
   document.getElementById('modalGuarantorName').value = record ? (record.guarantorName || '') : '';
   document.getElementById('modalNote').value = record ? (record.note || '') : '';
 
@@ -1308,8 +1371,7 @@ function editRecord(id) {
 function handleDeleteRecord(id) {
   if (confirm('確定要刪除這筆債權憑證案件嗎？')) {
     deleteRecord(id);
-    renderLedgerKpis();
-    renderLedgerTable();
+    refreshLedgerView();
     showToast('🗑️ 已刪除該筆案件');
   }
 }
@@ -1344,6 +1406,14 @@ function initDemoDataButton() {
   if (!demoBtn) return;
 
   demoBtn.addEventListener('click', () => {
+    // 正式站的同仁也看得到這顆按鈕：先確認，避免誤按就蓋掉正在填的書狀
+    if (!confirm('會以測試範例取代目前「法催公文」表單的內容；台帳若是空的，另會新增 2 筆範例案件（可自行刪除）。\n\n確定要填入嗎？')) return;
+    // 先清空整張表單再填（保留目前選的公文種類），範例才不會和上一案留下的保證人、繼承人、執行標的混在一起
+    const docTypeEl = document.getElementById('docType');
+    const keepDocType = docTypeEl ? docTypeEl.value : '';
+    resetDocFormFields();
+    if (docTypeEl && keepDocType) docTypeEl.value = keepDocType;
+
     if (document.getElementById('scriptDebtorName')) document.getElementById('scriptDebtorName').value = '林志明';
     if (document.getElementById('scriptOverdueMonths')) document.getElementById('scriptOverdueMonths').value = 2;
     if (document.getElementById('scriptOverdueAmount')) document.getElementById('scriptOverdueAmount').value = 36000;
@@ -1380,7 +1450,6 @@ function initDemoDataButton() {
     const guarantorCheck = document.getElementById('docHasGuarantor');
     if (guarantorCheck) {
       guarantorCheck.checked = true;
-      document.getElementById('guarantorFieldsWrap').style.display = 'block';
       document.getElementById('docGuarantorName').value = '林美惠';
       document.getElementById('docGuarantorId').value = 'B220112233';
       document.getElementById('docGuarantorAddress').value = '臺中市南屯區大墩路 80 號';
@@ -1396,7 +1465,7 @@ function initDemoDataButton() {
         principal: 320000,
         issueDate: '2022-03-15',
         guarantorName: '林美惠',
-        note: '已扣薪 3 期，後離職'
+        note: '【範例，可刪除】已扣薪 3 期，後離職'
       });
       saveRecord({
         debtorName: '陳美玲',
@@ -1406,13 +1475,15 @@ function initDemoDataButton() {
         principal: 150000,
         issueDate: '2021-10-01',
         guarantorName: '',
-        note: '時效即將於近期屆滿，需具狀換證'
+        note: '【範例，可刪除】時效即將於近期屆滿，需具狀換證'
       });
     }
 
-    renderLedgerKpis();
-    renderLedgerTable();
+    refreshLedgerView();
     updateScriptsPreview();
+    validateInterestRateInput();
+    validatePenaltyRatioInput();
+    updateDocTypeVisibility();
     updateDocPreview();
     showToast('✨ 已載入儲蓄互助社實務測試範例資料！');
   });

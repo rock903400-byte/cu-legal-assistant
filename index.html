@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="儲蓄互助社智慧法催公文助手與 5 年時效到期鬧鐘：純前端本地運算、零個資外洩、司法院標準訴狀一鍵排版（支付命令、強制執行、換發債權憑證）、115年扣薪計算機、5年時效管理台帳與行事曆鬧鐘推播。">
   <title>儲蓄互助社 智慧法催公文助手與 5 年時效到期鬧鐘</title>
-  <!-- Cache Busting v2.3.2 -->
-  <link rel="stylesheet" href="css/style.css?v=2.3.2">
-  <link rel="stylesheet" href="css/print.css?v=2.3.2" media="print">
+  <!-- Cache Busting v2.3.3 -->
+  <link rel="stylesheet" href="css/style.css?v=2.3.3">
+  <link rel="stylesheet" href="css/print.css?v=2.3.3" media="print">
 </head>
 <body>
 
@@ -257,10 +257,11 @@
                   </div>
                 </div>
 
-                <!-- 支付命令專屬：債權憑據、違約金比例、利率變動 -->
-                <div id="paymentOnlyFields" class="col-span-full" style="display:none;">
+                <!-- 支付命令、強制執行共用：違約金（強執的聲請事項須與執行名義一致，因此兩者都要看得到）；
+                     債權憑據與利率變動僅支付命令使用 -->
+                <div id="claimTermsFields" class="col-span-full" style="display:none;">
                   <div class="form-grid">
-                    <div class="form-group">
+                    <div class="form-group" id="basisTypeGroup">
                       <label for="docBasisType">債權憑據</label>
                       <select id="docBasisType" class="form-control">
                         <option value="loan">借據（借款申請書兼借據）</option>
@@ -271,7 +272,7 @@
                       <label for="docPenaltyRatio">違約金：按利息之百分之（％）</label>
                       <input type="number" step="1" id="docPenaltyRatio" class="form-control" placeholder="例：10（無違約金條款請留空）">
                       <div class="field-tip-box">
-                        💡 依借據約定「逾期違約金按利息百分之幾計算」；協會《儲蓄互助社辦理放款實施要點》第 19 條規定違約利率最高 15%。請求至清償日止，確定後不能在執行階段補列。
+                        💡 依借據約定「逾期違約金按利息百分之幾計算」；協會《儲蓄互助社辦理放款實施要點》第 19 條規定違約利率最高 15%。支付命令請求至清償日止；強制執行須與執行名義所載一致，執行名義沒有的違約金不能在執行階段補列（沒有請留空）。
                       </div>
                       <div id="penaltyAlertBox" class="alert-box danger" style="display:none; margin-top:6px;"></div>
                     </div>
@@ -282,7 +283,7 @@
                         💡 留空＝與利息同時起算；借據約定違約金另有起算日才需填寫。
                       </div>
                     </div>
-                    <div class="form-group col-span-full">
+                    <div class="form-group col-span-full" id="rateChangedGroup">
                       <label style="cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
                         <input type="checkbox" id="docRateChanged" style="width:18px; height:18px; accent-color:var(--navy-accent);">
                         <span>利率、違約金曾經理事會決議調整（附理事會紀錄為證）</span>
@@ -450,6 +451,9 @@
                 <h3 style="font-size:0.98rem; font-weight:800; color:var(--navy-primary); margin-bottom:8px;">
                   🎯 聲請強制執行之標的及方法（勾選欲查扣項目）：
                 </h3>
+                <div id="deceasedTargetHint" class="alert-box info" style="display:none; margin-bottom:10px;">
+                  債務人已死亡：「扣押每月 1/3 薪資」與「查調勞保投保單位」不適用（亡者沒有薪資，也不可扣繼承人自己的薪資），書狀不會列入；其餘標的寫成「被繼承人○○」的財產。
+                </div>
                 <div class="checkbox-card-grid">
                   <label class="checkbox-card">
                     <input type="checkbox" id="targetBankDeposit" checked>
@@ -738,7 +742,7 @@
                   <option value="taoyuan">桃園市（115年度 17,186 元/月，1.2倍基準為 20,623 元）</option>
                   <option value="tainan">臺南市（115年度 15,515 元/月，1.2倍基準為 18,618 元）</option>
                   <option value="kaohsiung">高雄市（115年度 16,970 元/月，1.2倍基準為 20,364 元）</option>
-                  <option value="taiwan_province">臺灣省各縣市 (彰投苗雲嘉屏東花宜基澎)（115年度 15,515 元/月，1.2倍基準為 18,618 元）</option>
+                  <option value="taiwan_province">臺灣省各縣市（六都、金門、連江以外）（115年度 15,515 元/月，1.2倍基準為 18,618 元）</option>
                   <option value="kinmen_lienchiang">金門縣、連江縣（115年度 15,173 元/月，1.2倍基準為 18,208 元）</option>
                 </select>
               </div>
@@ -1191,15 +1195,15 @@
     中華民國儲蓄互助協會 督導協同系統 ｜ 智慧法催公文助手與 5 年時效到期鬧鐘 © 2026
   </footer>
 
-  <!-- 腳本引入 (Cache Busting v2.3.2) -->
-  <script src="js/config.js?v=2.3.2"></script>
-  <script src="js/court-data.js?v=2.3.2"></script>
-  <script src="js/core-legal.js?v=2.3.2"></script>
-  <script src="js/salary-calc.js?v=2.3.2"></script>
-  <script src="js/templates.js?v=2.3.2"></script>
-  <script src="js/scripts.js?v=2.3.2"></script>
-  <script src="js/storage.js?v=2.3.2"></script>
-  <script src="js/app.js?v=2.3.2"></script>
+  <!-- 腳本引入 (Cache Busting v2.3.3) -->
+  <script src="js/config.js?v=2.3.3"></script>
+  <script src="js/court-data.js?v=2.3.3"></script>
+  <script src="js/core-legal.js?v=2.3.3"></script>
+  <script src="js/salary-calc.js?v=2.3.3"></script>
+  <script src="js/templates.js?v=2.3.3"></script>
+  <script src="js/scripts.js?v=2.3.3"></script>
+  <script src="js/storage.js?v=2.3.3"></script>
+  <script src="js/app.js?v=2.3.3"></script>
 
 </body>
 </html>

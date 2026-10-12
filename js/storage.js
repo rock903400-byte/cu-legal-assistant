@@ -72,6 +72,16 @@ function icsText(value) {
 }
 
 /**
+ * 全天事件的 DTEND：RFC 5545 規定 DTEND 不含當日，單日事件須為隔天（YYYY-MM-DD → YYYYMMDD）
+ * DTEND 與 DTSTART 同一天會變成零長度事件，部分行事曆軟體匯入異常
+ */
+function icsAllDayEnd(dateStr) {
+  const [y, m, d] = String(dateStr || '').split('-').map(Number);
+  const next = new Date(y, m - 1, d + 1);
+  return `${next.getFullYear()}${String(next.getMonth() + 1).padStart(2, '0')}${String(next.getDate()).padStart(2, '0')}`;
+}
+
+/**
  * iCalendar 長行摺疊 (RFC 5545 3.1)：每行不得逾 75 octets
  * 以 UTF-8 位元組計算，且不可從多位元組字元中間切開
  */
@@ -145,31 +155,47 @@ function ensureRecordIds(records) {
 }
 
 /**
+ * 讀出 localStorage 裡的台帳原始清單
+ * ok=false 表示資料存在卻讀不出來（損毀或不是陣列）：此時呼叫端不可寫回，
+ * 否則一存檔就會用空清單覆蓋掉全部案件
+ * @returns {{ok: boolean, list: Array}}
+ */
+function readStoredRecords() {
+  try {
+    if (typeof localStorage === 'undefined') return { ok: true, list: [] };
+    const raw = localStorage.getItem(STORAGE_KEYS.RECORDS);
+    if (!raw) return { ok: true, list: [] };
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return { ok: false, list: [] };
+    const { list, changed } = ensureRecordIds(parsed);
+    // 舊資料缺 id 時補發後寫回，之後的編輯、刪除才找得到同一筆
+    if (changed) safeSetItem(STORAGE_KEYS.RECORDS, JSON.stringify(list));
+    return { ok: true, list };
+  } catch (e) {
+    console.error('Failed to load records from localStorage', e);
+    return { ok: false, list: [] };
+  }
+}
+
+function withExpiryInfo(item) {
+  return { ...item, ...calculate5YearExpiryHelper(item.issueDate) };
+}
+
+/**
  * 載入儲存的憑證與法催台帳案件清單
  */
 function loadRecords() {
-  try {
-    if (typeof localStorage === 'undefined') return [];
-    const raw = localStorage.getItem(STORAGE_KEYS.RECORDS);
-    if (!raw) return [];
-    const { list, changed } = ensureRecordIds(JSON.parse(raw));
-    // 舊資料缺 id 時補發後寫回，之後的編輯、刪除才找得到同一筆
-    if (changed) safeSetItem(STORAGE_KEYS.RECORDS, JSON.stringify(list));
-    return list.map(item => {
-      const expiryInfo = calculate5YearExpiryHelper(item.issueDate);
-      return { ...item, ...expiryInfo };
-    });
-  } catch (e) {
-    console.error('Failed to load records from localStorage', e);
-    return [];
-  }
+  return readStoredRecords().list.map(withExpiryInfo);
 }
 
 /**
  * 儲存/更新一筆台帳案件
+ * @returns 案件資料，另含 saved（是否寫入成功）與 reason（失敗原因：'unreadable' 台帳讀不出來、'quota' 寫入失敗）
  */
 function saveRecord(record) {
-  const list = loadRecords();
+  const stored = readStoredRecords();
+  if (!stored.ok) return { ...record, saved: false, reason: 'unreadable' };
+  const list = stored.list.map(withExpiryInfo);
   // 沒有 id 一律視為新增，不可拿 undefined 去比對而覆蓋到別筆
   const index = record.id ? list.findIndex(r => r.id === record.id) : -1;
   
@@ -189,15 +215,16 @@ function saveRecord(record) {
   }
 
   const saved = safeSetItem(STORAGE_KEYS.RECORDS, JSON.stringify(list));
-  return { ...updatedRecord, saved };
+  return { ...updatedRecord, saved, reason: saved ? '' : 'quota' };
 }
 
 /**
- * 刪除案件
+ * 刪除案件（台帳讀不出來時不寫回，避免覆蓋）
  */
 function deleteRecord(id) {
-  let list = loadRecords();
-  list = list.filter(r => r.id !== id);
+  const stored = readStoredRecords();
+  if (!stored.ok) return [];
+  const list = stored.list.map(withExpiryInfo).filter(r => r.id !== id);
   safeSetItem(STORAGE_KEYS.RECORDS, JSON.stringify(list));
   return list;
 }
@@ -211,10 +238,12 @@ function getRecord(id) {
 }
 
 /**
- * 台帳「換證」：把案件帶入《民事聲請換發債權憑證狀》的表單欄位（欄位 id → 值）
+ * 台帳「換證」：把案件帶入《民事聲請換發債權憑證狀》的表單欄位（欄位 id → 值；勾選框為 true/false）
  * - 台帳的憑證號碼就是本件的執行名義（原債權憑證）案號，帶入「案號（原執行名義）」
  * - 書狀抬頭的「案號、股別」是這次聲請執行後法院分的新案號，尚未知道，一律清空以「○」待填
- * - 執行名義核發法院清空＝與管轄法院相同；以上都不可沿用上一案留在表單的值
+ * - 執行名義核發法院清空＝與管轄法院相同
+ * - 台帳沒有的當事人資料（地址、保證人身分證與住址、其他保證人、死亡與繼承人、離職單位）一律清空，
+ *   不可沿用上一案留在表單的值，否則書狀會印出別人的地址或繼承人；台帳有保證人時自動勾選
  */
 function buildRenewFormFromRecord(record) {
   const r = record || {};
@@ -223,9 +252,19 @@ function buildRenewFormFromRecord(record) {
     docTitleType: 'cert',
     docDebtorName: r.debtorName || '',
     docDebtorId: r.debtorId || '',
+    docDebtorAddress: '',
     docPrincipal: r.principal || 0,
     docCourt: r.courtName || '臺中',
+    docHasGuarantor: !!r.guarantorName,
     docGuarantorName: r.guarantorName || '',
+    docGuarantorId: '',
+    docGuarantorAddress: '',
+    docExtraParties: '',
+    docDebtorDeceased: false,
+    docHeirs: '',
+    docDeceasedDate: '',
+    docRenewReason: 'no_property',
+    docResignedEmployer: '',
     docTitleCourt: '',
     docTitleCaseNo: r.certNo || '',
     docCaseYear: '',
@@ -245,6 +284,7 @@ function getLedgerMetrics(records = null) {
   let warning = 0;  // 90 ~ 180天
   let safe = 0;     // > 180天
   let expired = 0;  // <= 0天
+  let pending = 0;  // 核發日未填或格式錯誤，算不出預警日（不可算成安全期）
   let totalPrincipal = 0;
 
   list.forEach(r => {
@@ -252,7 +292,8 @@ function getLedgerMetrics(records = null) {
     if (r.status === 'urgent') urgent++;
     else if (r.status === 'warning') warning++;
     else if (r.status === 'expired') expired++;
-    else safe++;
+    else if (r.status === 'safe') safe++;
+    else pending++;
   });
 
   return {
@@ -261,6 +302,7 @@ function getLedgerMetrics(records = null) {
     warning,
     safe,
     expired,
+    pending,
     totalPrincipal
   };
 }
@@ -336,7 +378,7 @@ function generateICSContent(records) {
 UID:cu-statute-${r.id || Date.now()}@creditunion.local
 DTSTAMP:${nowStr}
 DTSTART;VALUE=DATE:${expiryDateCompact}
-DTEND;VALUE=DATE:${expiryDateCompact}
+DTEND;VALUE=DATE:${icsAllDayEnd(r.expiryDateStr)}
 SUMMARY:【5 年預警日】債權憑證換發 - ${name}（${certNo}）
 DESCRIPTION:債務人：${name}\\n身分證字號：${debtorId}\\n債權憑證案號：${certNo}\\n管轄法院：${courtName}\\n未償本金：新臺幣 ${amountStr} 元\\n原核發日：${issueDate}\\n\\n⚠️ 今日是此債權憑證核發滿 5 年的預警日（利息請求權時效 5 年，民法第 126 條；本金 15 年，第 125 條），請確認已具狀向法院聲請換發債權憑證，避免利息請求權罹於時效。
 STATUS:CONFIRMED
@@ -393,7 +435,7 @@ BEGIN:VEVENT
 UID:cu-notice-${uidSeed}@creditunion.local
 DTSTAMP:${nowStr}
 DTSTART;VALUE=DATE:${expiryCompact}
-DTEND;VALUE=DATE:${expiryCompact}
+DTEND;VALUE=DATE:${icsAllDayEnd(info.expiryDateStr)}
 SUMMARY:【催告 6 個月起訴期限】${name}
 DESCRIPTION:債務人：${name}\\n存證信函送達日：${noticeDate}\\n\\n⚠️ 民法第 130 條：催告後 6 個月內未起訴（含聲請支付命令），時效視為不中斷。今日為期限最後一日，請確認已向法院聲請支付命令或起訴。
 STATUS:CONFIRMED
@@ -530,7 +572,7 @@ function exportRecordsToCSV(records) {
 function exportRecordsToJSON(records) {
   const data = {
     exportedAt: new Date().toISOString(),
-    version: '2.3.0',
+    version: '2.3.3',
     profile: loadCuProfile(),
     records: records
   };
@@ -539,22 +581,50 @@ function exportRecordsToJSON(records) {
 }
 
 /**
- * 匯入 JSON 備份
+ * 解析備份檔並回傳將匯入的筆數（不寫入），供匯入前確認
+ * @returns {{success: boolean, count?: number, error?: string}}
+ */
+function previewImportJSON(jsonText) {
+  try {
+    const data = JSON.parse(jsonText);
+    if (!data || !Array.isArray(data.records)) {
+      return { success: false, error: '無效的備份檔案格式' };
+    }
+    return { success: true, count: ensureRecordIds(data.records).list.length };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/** 本社資料是否已設定（任一欄位有值） */
+function hasCuProfile() {
+  const profile = loadCuProfile();
+  return !!profile && typeof profile === 'object' &&
+    Object.values(profile).some(v => String(v === null || v === undefined ? '' : v).trim() !== '');
+}
+
+/**
+ * 匯入 JSON 備份：以備份檔的案件「取代」目前台帳（呼叫端須先經使用者確認）
+ * 本社資料只在目前尚未設定時才從備份帶入，避免匯入他社的備份就把本社名稱、統編換掉
+ * @returns {{success: boolean, count?: number, profileImported?: boolean, profileKept?: boolean, error?: string}}
  */
 function importRecordsFromJSON(jsonText) {
   try {
     const data = JSON.parse(jsonText);
-    if (!data.records || !Array.isArray(data.records)) {
+    if (!data || !Array.isArray(data.records)) {
       throw new Error('無效的備份檔案格式');
     }
     const { list } = ensureRecordIds(data.records);
     if (!safeSetItem(STORAGE_KEYS.RECORDS, JSON.stringify(list))) {
       return { success: false, error: '瀏覽器儲存空間不足，匯入失敗' };
     }
-    if (data.profile) {
-      safeSetItem(STORAGE_KEYS.PROFILE, JSON.stringify(data.profile));
+    const backupHasProfile = !!data.profile && typeof data.profile === 'object' && !Array.isArray(data.profile);
+    const profileKept = backupHasProfile && hasCuProfile();
+    let profileImported = false;
+    if (backupHasProfile && !profileKept) {
+      profileImported = safeSetItem(STORAGE_KEYS.PROFILE, JSON.stringify(data.profile));
     }
-    return { success: true, count: list.length };
+    return { success: true, count: list.length, profileImported, profileKept };
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -581,7 +651,10 @@ if (typeof module !== 'undefined' && module.exports) {
     escapeHtmlText,
     exportRecordsToCSV,
     exportRecordsToJSON,
+    previewImportJSON,
     importRecordsFromJSON,
+    readStoredRecords,
+    icsAllDayEnd,
     safeSetItem,
     csvCell,
     icsText,

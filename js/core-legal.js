@@ -54,9 +54,8 @@ function toChineseCurrency(num) {
       }
     }
 
+    // 前面已排除超過 Number.MAX_SAFE_INTEGER（16 位數）的金額，最多 4 組，「兆」位即足夠
     if (groupResult !== '') {
-      // 超出「兆」位 (10^16 以上) 無對應中文單位，避免輸出 undefined
-      if (i >= bigUnits.length) return null;
       result = groupResult + bigUnits[i] + result;
     }
   }
@@ -65,10 +64,6 @@ function toChineseCurrency(num) {
   result = result.replace(/零+/g, '零').replace(/零萬/g, '萬').replace(/零億/g, '億');
   if (result.endsWith('零')) {
     result = result.slice(0, -1);
-  }
-
-  if (result === null) {
-    return `⚠️金額 ${n.toLocaleString()} 超出中文大寫可轉換範圍，請人工填寫`;
   }
 
   return '新臺幣' + result + '元整';
@@ -180,6 +175,19 @@ function addMonthsWithEomAdjust(dateObj, monthsToAdd) {
 }
 
 /**
+ * 解析 YYYY-MM-DD；格式不符或不是真實日期（如 2023-02-30）時回傳 null
+ * @returns {number[]|null} [年, 月, 日]
+ */
+function parseDateParts(dateStr) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(typeof dateStr === 'string' ? dateStr : '');
+  if (!match) return null;
+  const [y, m, d] = match.slice(1).map(Number);
+  const date = new Date(y, m - 1, d);
+  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
+  return [y, m, d];
+}
+
+/**
  * 計算債權憑證「5 年預警日」與狀態燈號
  * 依據：利息請求權時效 5 年（民法第 126 條），本金 15 年（民法第 125 條）。
  * 5 年是保守的預警設計，用意是在利息時效屆滿前換證，並不代表本金 5 年即失效。
@@ -198,8 +206,21 @@ function calculate5YearExpiry(issueDateStr, currentDate = new Date()) {
     };
   }
 
-  const [y, m, d] = issueDateStr.split('-').map(Number);
-  
+  // 匯入的備份可能有「2022/01/01」或數字等格式；不可拋錯（會讓整本台帳讀不出來），
+  // 也不可算成 NaN 而落入「安全期」，一律標為日期格式錯誤
+  const parts = parseDateParts(issueDateStr);
+  if (!parts) {
+    return {
+      issueDateStr: String(issueDateStr),
+      expiryDateStr: '',
+      remainingDays: 0,
+      status: 'invalid',
+      statusText: '核發日格式錯誤（請編輯更正）',
+      color: '#94A3B8'
+    };
+  }
+  const [y, m, d] = parts;
+
   // 計算 5 年後 (若為 2/29 閏日，加 5 年非閏年則自動設為 2/28)
   const targetYear = y + 5;
   let targetMonth = m - 1;
@@ -252,13 +273,21 @@ function calculate5YearExpiry(issueDateStr, currentDate = new Date()) {
 
 /**
  * 依民法第 130 條計算催告後 6 個月內起訴期限
+ * - 民法第 120 條第 2 項：始日不算入，自送達翌日起算
+ * - 民法第 121 條第 2 項：以最後之月與起算日相當日之前一日為末日；
+ *   最後之月無相當日者，以其月之末日為末日
+ * 例：1/15 送達 → 1/16 起算 → 7/15；4/30 送達 → 5/1 起算（整月）→ 10/31；8/30 送達 → 8/31 起算 → 2 月末日
  */
 function calculate6MonthNoticeExpiry(noticeDateStr, currentDate = new Date()) {
   if (!noticeDateStr) return null;
   const [y, m, d] = noticeDateStr.split('-').map(Number);
-  const noticeDate = new Date(y, m - 1, d);
-  
-  const expiryDate = addMonthsWithEomAdjust(noticeDate, 6);
+  const startDate = new Date(y, m - 1, d + 1);
+
+  const expiryDate = addMonthsWithEomAdjust(startDate, 6);
+  // 有相當日時取其前一日；無相當日時 addMonthsWithEomAdjust 已落在該月末日，即為末日
+  if (expiryDate.getDate() === startDate.getDate()) {
+    expiryDate.setDate(expiryDate.getDate() - 1);
+  }
 
   const todayZero = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
   const diffTime = expiryDate.getTime() - todayZero.getTime();
@@ -346,6 +375,7 @@ if (typeof module !== 'undefined' && module.exports) {
     formatRocDate,
     getCurrentRocDate,
     formatLocalDate,
+    parseDateParts,
     addDaysToDateStr,
     calcPostalLetterLayout,
     addMonthsWithEomAdjust

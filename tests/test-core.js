@@ -780,4 +780,178 @@ delete global.localStorage;
 assert.deepStrictEqual(ledgerFailures, [], `台帳換證與匯入測試未通過：\n- ${ledgerFailures.join('\n- ')}`);
 console.log('  ✅ 台帳換證帶入與匯入資料 id 測試通過');
 
+// 18. 2026-10-12 全端 review：跨案殘留、隱藏欄位、死亡案件措辭、匯入、壞資料、期間計算
+console.log('\n18. 全端 review 修正（跨案殘留、死亡案件、匯入、期間計算）');
+const fullReviewFailures = [];
+const check18 = (desc, fn) => {
+  try {
+    if (!fn()) fullReviewFailures.push(desc);
+  } catch (e) {
+    fullReviewFailures.push(`${desc}（${e.message}）`);
+  }
+};
+const appSrc = fs.readFileSync(require('path').join(__dirname, '../js/app.js'), 'utf8');
+const fnBody = (src, name) => {
+  const start = src.indexOf(`function ${name}(`);
+  if (start < 0) return '';
+  const next = src.indexOf('\nfunction ', start + 1);
+  return src.slice(start, next < 0 ? undefined : next);
+};
+
+// 18.1 換證：台帳沒有的當事人資料一律清空，不沿用上一案；台帳有保證人時自動勾選
+const renewForm18 = storageModule.buildRenewFormFromRecord({ debtorName: '乙某', certNo: '110 年度司執字第 1 號', courtName: '臺中', principal: 1, guarantorName: '乙保' });
+check18('換證清空上一案的債務人地址', () => renewForm18.docDebtorAddress === '');
+check18('換證清空上一案保證人的身分證、住址與其他保證人', () =>
+  renewForm18.docGuarantorId === '' && renewForm18.docGuarantorAddress === '' && renewForm18.docExtraParties === '');
+check18('換證取消上一案的「已死亡」與繼承人', () =>
+  renewForm18.docDebtorDeceased === false && renewForm18.docHeirs === '' && renewForm18.docDeceasedDate === '');
+check18('換證的聲請原因回到預設、清空離職單位', () => renewForm18.docRenewReason === 'no_property' && renewForm18.docResignedEmployer === '');
+check18('台帳有保證人時自動勾選「含連帶保證人」', () => renewForm18.docHasGuarantor === true && renewForm18.docGuarantorName === '乙保');
+check18('台帳沒有保證人時不勾選', () =>
+  storageModule.buildRenewFormFromRecord({ debtorName: '丙', guarantorName: '' }).docHasGuarantor === false);
+check18('換證先把公文表單全部恢復初始值（只限公文分頁），勾選框以 checked 帶入', () => {
+  const body = fnBody(appSrc, 'triggerRenewDoc');
+  return body.includes('resetDocFormFields();') && body.indexOf('resetDocFormFields();') < body.indexOf('buildRenewFormFromRecord(') &&
+    body.includes("el.type === 'checkbox'") && fnBody(appSrc, 'resetDocFormFields').includes('#tab-docs .doc-form-pane');
+});
+check18('保證人欄位一律跟著勾選框顯示', () => fnBody(appSrc, 'updateDocTypeVisibility').includes("show('guarantorFieldsWrap', checked('docHasGuarantor'))"));
+
+// 18.2 違約金會印進強執狀，欄位在強制執行也必須看得到
+check18('違約金比例、起算日放在支付命令與強制執行共用的區塊', () => {
+  const start = reviewHtml.indexOf('id="claimTermsFields"');
+  const end = reviewHtml.indexOf('id="docManualInterest"');
+  const block = reviewHtml.slice(start, end);
+  return start > 0 && block.includes('id="docPenaltyRatio"') && block.includes('id="docPenaltyStartDate"') && !reviewHtml.includes('paymentOnlyFields');
+});
+check18('共用區塊在支付命令與強制執行顯示；債權憑據、利率變動只在支付命令', () => {
+  const body = fnBody(appSrc, 'updateDocTypeVisibility');
+  return body.includes("show('claimTermsFields', isPayment || isExec)") &&
+    body.includes("show('basisTypeGroup', isPayment") && body.includes("show('rateChangedGroup', isPayment");
+});
+
+// 18.3 債務人已死亡：查調、扣押對象是被繼承人的遺產；薪資、勞保不列入
+const deceased18 = generateExecutionDoc({
+  ...rv, debtorDeceased: true, heirs: '王大明｜C111111111｜臺北市',
+  targets: { bankDeposit: true, postOffice: true, salary: true, employerName: '某公司', laborInsurance: true,
+    insurance: true, taxData: true, movables: true, realEstate: true }
+});
+check18('死亡：存款（查調銀行公會）寫被繼承人', () =>
+  deceased18.includes('扣押並收取被繼承人王小明於金融機構之存款債權') && deceased18.includes('查調被繼承人王小明之全部開戶銀行'));
+check18('死亡：郵局存款寫被繼承人', () => deceased18.includes('覆明被繼承人王小明持有存款之受託存款郵局資料'));
+check18('死亡：壽險寫被繼承人為要保人', () =>
+  deceased18.includes('查調被繼承人王小明為要保人之人壽保險契約') && deceased18.includes('被繼承人王小明為要保人之健康保險、傷害保險契約'));
+check18('死亡：國稅局查調寫被繼承人', () => deceased18.includes('查調被繼承人王小明最新全年度財產總歸戶清單'));
+check18('死亡：不列薪資扣押、勞保查調，也不列雇主為第三人', () =>
+  !deceased18.includes('每月領有薪資') && !deceased18.includes('勞工保險局') && !deceased18.includes('第三人：某公司'));
+check18('死亡：證物寫被繼承人除戶謄本、被繼承人所有之土地謄本', () =>
+  deceased18.includes('被繼承人除戶謄本一份') && deceased18.includes('被繼承人所有土地（建物）登記簿謄本一份'));
+check18('死亡且沒有勾國稅局：證物為被繼承人國稅局清單', () =>
+  generateExecutionDoc({ ...rv, debtorDeceased: true, heirs: '王大明', targets: { bankDeposit: true } }).includes('被繼承人國稅局所得（財產）清單影本一份'));
+check18('死亡且只勾薪資：改列查調存款與財產，對象為被繼承人', () => {
+  const doc = generateExecutionDoc({ ...rv, debtorDeceased: true, heirs: '王大明', targets: { salary: true } });
+  return doc.includes('查調被繼承人王小明存款帳戶並予扣押') && doc.includes('查調被繼承人王小明之財產與所得清單') && !doc.includes('每月領有薪資');
+});
+const alive18 = generateExecutionDoc({
+  ...rv, targets: { bankDeposit: true, postOffice: true, salary: true, employerName: '某公司', insurance: true, taxData: true, movables: true }
+});
+check18('一般案件措辭不變（仍寫「債務人」、仍有薪資與雇主）', () =>
+  alive18.includes('扣押並收取債務人於金融機構之存款債權') && alive18.includes('覆明債務人持有存款') &&
+  alive18.includes('查調債務人為要保人之人壽保險契約') && alive18.includes('債務人現服務於第三人某公司處') &&
+  alive18.includes('第三人：某公司') && alive18.includes('債務人戶籍謄本一份'));
+check18('死亡案件勾薪資或勞保時畫面提示不適用', () =>
+  reviewHtml.includes('id="deceasedTargetHint"') && fnBody(appSrc, 'updateDocTypeVisibility').includes("show('deceasedTargetHint'"));
+
+// 18.4 民法第 120 條第 2 項（始日不算入）、第 121 條第 2 項：6 個月起訴期限
+const sixMonth = (d) => calculate6MonthNoticeExpiry(d, new Date(2026, 0, 1)).expiryDateStr;
+[
+  ['2026-04-30', '2026-10-31'], ['2027-02-28', '2027-08-31'], ['2026-06-30', '2026-12-31'], ['2026-09-30', '2027-03-31'],
+  ['2026-01-15', '2026-07-15'], ['2026-08-30', '2027-02-28'], ['2027-08-30', '2028-02-29'], ['2028-02-28', '2028-08-28'],
+  ['2028-02-29', '2028-08-31'], ['2026-08-31', '2027-02-28'], ['2026-03-31', '2026-09-30']
+].forEach(([notice, expected]) => check18(`6 個月期限：${notice} 送達 → ${expected}`, () => sixMonth(notice) === expected));
+check18('4/30 送達：10/31 當天仍在期限內（末日）', () => {
+  const r = calculate6MonthNoticeExpiry('2026-04-30', new Date(2026, 9, 31));
+  return r.isLastDay === true && r.isExpired === false;
+});
+
+// 18.5 核發日格式錯誤：不可拋錯讓台帳讀不出來，也不可算成安全期
+check18('核發日為數字：標為格式錯誤', () => calculate5YearExpiry(20220101).status === 'invalid');
+check18('核發日為 2022/01/01：標為格式錯誤', () => calculate5YearExpiry('2022/01/01').status === 'invalid');
+check18('核發日不存在（2023-02-30）：標為格式錯誤', () => calculate5YearExpiry('2023-02-30').status === 'invalid');
+check18('正常核發日不受影響', () => calculate5YearExpiry('2022-01-01', new Date(2026, 0, 1)).expiryDateStr === '2027-01-01');
+
+global.localStorage = fakeStorage;
+const RKEY = storageModule.STORAGE_KEYS.RECORDS;
+// 損毀資料的測試會觸發 storage.js 的 console.error（預期行為），測試期間不輸出以免誤以為失敗
+const quietConsoleError = console.error;
+console.error = () => {};
+check18('一筆壞資料不影響其他案件載入', () => {
+  fakeStorage.s = { [RKEY]: JSON.stringify([{ id: 'a', debtorName: '好', issueDate: '2022-01-01' }, { id: 'b', debtorName: '壞', issueDate: 20220101 }]) };
+  const list = storageModule.loadRecords();
+  return list.length === 2 && list.find(r => r.id === 'b').status === 'invalid';
+});
+check18('有壞資料時新增案件，原有案件都還在', () => {
+  fakeStorage.s = { [RKEY]: JSON.stringify([{ id: 'a', debtorName: '好', issueDate: '2022-01-01' }, { id: 'b', debtorName: '壞', issueDate: 20220101 }]) };
+  storageModule.saveRecord({ debtorName: '新', issueDate: '2023-01-01' });
+  return storageModule.loadRecords().map(r => r.debtorName).sort().join('') === ['好', '壞', '新'].sort().join('');
+});
+check18('台帳讀不出來時拒絕存檔，原資料不被覆蓋', () => {
+  fakeStorage.s = { [RKEY]: '損毀的資料' };
+  const res = storageModule.saveRecord({ debtorName: '新', issueDate: '2023-01-01' });
+  return res.saved === false && res.reason === 'unreadable' && fakeStorage.s[RKEY] === '損毀的資料';
+});
+check18('台帳讀不出來時刪除也不寫回', () => {
+  fakeStorage.s = { [RKEY]: '損毀的資料' };
+  storageModule.deleteRecord('x');
+  return fakeStorage.s[RKEY] === '損毀的資料';
+});
+check18('KPI：未填或格式錯誤的核發日不算安全期', () => {
+  const m = storageModule.getLedgerMetrics([{ status: 'safe' }, { status: 'unknown' }, { status: 'invalid' }]);
+  return m.safe === 1 && m.pending === 2 && m.total === 3;
+});
+console.error = quietConsoleError;
+
+// 18.6 匯入：先確認、整批取代；本社資料已設定時不被備份覆蓋
+check18('匯入前可預覽筆數', () => storageModule.previewImportJSON(JSON.stringify({ records: [{ debtorName: '甲' }, null] })).count === 1);
+check18('本社資料已設定：匯入不覆蓋', () => {
+  fakeStorage.s = { [storageModule.STORAGE_KEYS.PROFILE]: JSON.stringify({ cuName: '本社' }) };
+  const res = storageModule.importRecordsFromJSON(JSON.stringify({ records: [], profile: { cuName: '他社' } }));
+  return res.success && res.profileKept === true && storageModule.loadCuProfile().cuName === '本社';
+});
+check18('本社資料尚未設定：從備份帶入', () => {
+  fakeStorage.s = {};
+  const res = storageModule.importRecordsFromJSON(JSON.stringify({ records: [], profile: { cuName: '本社' } }));
+  return res.success && res.profileImported === true && storageModule.loadCuProfile().cuName === '本社';
+});
+check18('畫面匯入前跳確認並說明是取代', () => {
+  const start = appSrc.indexOf("getElementById('importJSONFile')");
+  const block = appSrc.slice(start, start + 2500);
+  return block.includes('previewImportJSON(') && block.includes('confirm(') && block.includes('取代') &&
+    block.indexOf('confirm(') < block.indexOf('importRecordsFromJSON(');
+});
+delete global.localStorage;
+
+// 18.7 .ics 全天事件：DTEND 不含當日，須為隔天
+check18('台帳 .ics 的 DTEND 為預警日隔天', () =>
+  generateICSContent({ id: 'z', debtorName: 'X', issueDate: '2022-01-01', expiryDateStr: '2027-01-01', principal: 1 }).includes('DTEND;VALUE=DATE:20270102'));
+check18('起訴期限 .ics 的 DTEND 跨年也正確', () =>
+  generateNoticeDeadlineICS({ debtorName: 'X', noticeDateStr: '2026-06-30', expiryDateStr: '2026-12-31' }).includes('DTEND;VALUE=DATE:20270101'));
+
+// 18.8 台帳編輯視窗：核發日不預填今天；匯入資料缺欄位不顯示 undefined
+check18('新增案件的核發日不預填', () => {
+  const body = fnBody(appSrc, 'openRecordModal');
+  return !body.includes('todayLocalDateStr()') && body.includes("getElementById('modalIssueDate').value = field('issueDate')");
+});
+check18('缺欄位以空白顯示', () => fnBody(appSrc, 'openRecordModal').includes("getElementById('modalDebtorId').value = field('debtorId')"));
+
+// 18.9 雜項
+check18('臺北市大同區列入臺北地院', () => TAIWAN_COURTS.find(c => c.id === 'TPD').areas.includes('臺北市大同區'));
+check18('最低生活費「臺灣省各縣市」說明不漏列縣市', () => MIN_LIVING_EXPENSES_115.taiwan_province.name === '臺灣省各縣市（六都、金門、連江以外）');
+check18('填入範例前先確認', () => {
+  const start = appSrc.indexOf('function initDemoDataButton(');
+  return appSrc.slice(start, start + 800).includes('confirm(');
+});
+
+assert.deepStrictEqual(fullReviewFailures, [], `全端 review 修正測試未通過（${fullReviewFailures.length} 項）：\n- ${fullReviewFailures.join('\n- ')}`);
+console.log('  ✅ 全端 review 修正測試通過');
+
 console.log('\n🎉 所有全面升級單元測試全數驗證通過！');

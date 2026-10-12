@@ -501,10 +501,17 @@ function generateExecutionDoc(data) {
   const titleCaseNo = data.titleCaseNo || '○○ 年度 ○ 字第 ○○○○ 號';
 
   const p = resolveParties(data, '詳如執行名義');
-  const t = data.targets || {};
+  // 債務人已死亡：亡者沒有薪資可按月扣押，書狀的「債務人」又是繼承人（只在遺產範圍內負責），
+  // 扣繼承人自己的薪資、查繼承人的勞保投保單位都不對，因此薪資與勞保標的不列入
+  const t = p.isDeceased
+    ? { ...(data.targets || {}), salary: false, laborInsurance: false }
+    : (data.targets || {});
   // 執行標的的所有人：債務人已死亡時，標的是被繼承人的遺產，不可把亡者稱為「債務人」
   const ownerTitle = p.isDeceased ? '被繼承人' : '債務人';
   const owner = `${ownerTitle}${p.debtorName}`;
+  // 查調、扣押的對象：一般寫「債務人」；已死亡時寫「被繼承人○○」，
+  // 否則「債務人」指的是繼承人，等於去查扣繼承人自己的財產
+  const holder = p.isDeceased ? owner : '債務人';
   const claims = buildClaimItems(data, p, '執行程序費用');
   // 股票條款引用「聲請執行之事項」的款次：有前欠違約金時為三款（費用在第三款）
   const moneyItemsRef = claims.length > 2 ? `事項一至${CN_ORDINALS[claims.length - 2]}` : '事項一';
@@ -517,11 +524,11 @@ function generateExecutionDoc(data) {
   // 證物（依所勾標的決定；編號依實際順序）
   const exhibits = [{ key: 'title', text: `${titleType.exhibit}。` }];
   if (!t.taxData && (t.salary || t.bankDeposit || t.stock || t.laborInsurance || t.movables)) {
-    exhibits.push({ key: 'tax', text: '債務人國稅局所得（財產）清單影本一份。' });
+    exhibits.push({ key: 'tax', text: `${ownerTitle}國稅局所得（財產）清單影本一份。` });
   }
   if (t.salary || t.stock) exhibits.push({ key: 'public', text: '第三人公示查詢資料一份。' });
-  if (t.movables) exhibits.push({ key: 'household', text: '債務人戶籍謄本一份。' });
-  if (t.realEstate) exhibits.push({ key: 'land', text: '債務人所有土地（建物）登記簿謄本一份。' });
+  if (t.movables) exhibits.push({ key: 'household', text: p.isDeceased ? '被繼承人除戶謄本一份。' : '債務人戶籍謄本一份。' });
+  if (t.realEstate) exhibits.push({ key: 'land', text: `${ownerTitle}所有土地（建物）登記簿謄本一份。` });
   if (t.insurance) exhibits.push({ key: 'ruling', text: '最高法院 108 年度台抗大字第 897 號民事大法庭裁定要旨一份。' });
   if (p.isDeceased) exhibits.push({ key: 'heirs', text: '家事事件公告網路查詢資料一份。' });
   const exhibitNo = (key) => CN_ORDINALS[exhibits.findIndex(e => e.key === key)];
@@ -536,13 +543,13 @@ function generateExecutionDoc(data) {
     if (banks.length) {
       banks.forEach(b => push(`請就${owner}存放於第三人${b.name}之存款，於債權人聲請執行之債權範圍內予以扣押。`));
     } else {
-      push(`請准予扣押並收取債務人於金融機構之存款債權（含銀行、郵局、信用合作社、農漁會等）；或由 鈞院囑託【中華民國銀行商業同業公會全國聯合會】查調債務人之全部開戶銀行與存款帳號並予扣押。`);
+      push(`請准予扣押並收取${holder}於金融機構之存款債權（含銀行、郵局、信用合作社、農漁會等）；或由 鈞院囑託【中華民國銀行商業同業公會全國聯合會】查調${holder}之全部開戶銀行與存款帳號並予扣押。`);
     }
   }
 
   // 郵局存款（函詢中華郵政）
   if (t.postOffice) {
-    push(`請惠允函詢第三人${FIXED_THIRD_PARTIES.post.name}覆明債務人持有存款之受託存款郵局資料後，准向查得之郵局執行債務人持有之存款。`);
+    push(`請惠允函詢第三人${FIXED_THIRD_PARTIES.post.name}覆明${holder}持有存款之受託存款郵局資料後，准向查得之郵局執行${holder}持有之存款。`);
   }
 
   // 薪資：扣 1/3 並按月移轉，同時保留 1.2 倍最低生活費（強制執行法第 115 條之 1）
@@ -561,7 +568,7 @@ function generateExecutionDoc(data) {
   // - 壽險：解約金債權金額未逾第 123 條之 1 第 1 項額度者、或依同條第 2 項公告者，不得扣押；逾額度之契約仍得執行
   // - 健康保險、傷害保險：解約金債權一律不得扣押（第 129 條之 1、第 132 條之 1）
   if (t.insurance) {
-    push(`請准予囑託【中華民國人壽保險商業同業公會】查調債務人為要保人之人壽保險契約；就其中解約金債權金額逾保險法第 123 條之 1 第 1 項所定額度之契約（依同條第 2 項公告不得扣押者除外），於債權人聲請執行之債權範圍內予以扣押，並依最高法院 108 年度台抗大字第 897 號民事大法庭裁定意旨，於執行必要時命終止該保險契約，命第三人保險公司償付解約金。債務人為要保人之健康保險、傷害保險契約，其解約金債權依同法第 129 條之 1、第 132 條之 1 規定不得扣押，不在本件聲請範圍。`);
+    push(`請准予囑託【中華民國人壽保險商業同業公會】查調${holder}為要保人之人壽保險契約；就其中解約金債權金額逾保險法第 123 條之 1 第 1 項所定額度之契約（依同條第 2 項公告不得扣押者除外），於債權人聲請執行之債權範圍內予以扣押，並依最高法院 108 年度台抗大字第 897 號民事大法庭裁定意旨，於執行必要時命終止該保險契約，命第三人保險公司償付解約金。${holder}為要保人之健康保險、傷害保險契約，其解約金債權依同法第 129 條之 1、第 132 條之 1 規定不得扣押，不在本件聲請範圍。`);
   }
 
   // 股票（集保）
@@ -578,7 +585,7 @@ function generateExecutionDoc(data) {
 
   // 國稅局查調財產及所得
   if (t.taxData) {
-    push(`請 鈞院依職權囑託【財政部各地區國稅局】查調債務人${p.guarantors.length ? '及連帶保證人' : ''}最新全年度財產總歸戶清單及各類所得資料清單，以供查報財產並予執行。`);
+    push(`請 鈞院依職權囑託【財政部各地區國稅局】查調${holder}${p.guarantors.length ? '及連帶保證人' : ''}最新全年度財產總歸戶清單及各類所得資料清單，以供查報財產並予執行。`);
   }
 
   // 不動產
@@ -589,8 +596,8 @@ function generateExecutionDoc(data) {
   }
 
   if (items.length === 0) {
-    push('請准予囑託中華民國銀行商業同業公會全國聯合會查調債務人存款帳戶並予扣押。');
-    push('請准予囑託國稅局查調債務人之財產與所得清單。');
+    push(`請准予囑託中華民國銀行商業同業公會全國聯合會查調${holder}存款帳戶並予扣押。`);
+    push(`請准予囑託國稅局查調${holder}之財產與所得清單。`);
   }
 
   const docText = `民事強制執行聲請狀
