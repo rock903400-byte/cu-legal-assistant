@@ -17,6 +17,7 @@ let _calculateCourtFees = typeof calculateCourtFees !== 'undefined' ? calculateC
 let _getMinLivingStandard = typeof getMinLivingStandard !== 'undefined' ? getMinLivingStandard : null;
 let _addDaysToDateStr = typeof addDaysToDateStr !== 'undefined' ? addDaysToDateStr : null;
 let _getCourtByName = typeof getCourtByName !== 'undefined' ? getCourtByName : null;
+let _calculateEstimatedInterest = typeof calculateEstimatedInterest !== 'undefined' ? calculateEstimatedInterest : null;
 
 if (typeof require !== 'undefined') {
   try {
@@ -27,6 +28,7 @@ if (typeof require !== 'undefined') {
       _getCurrentRocDate = _getCurrentRocDate || core.getCurrentRocDate;
       _calculateCourtFees = _calculateCourtFees || core.calculateCourtFees;
       _addDaysToDateStr = _addDaysToDateStr || core.addDaysToDateStr;
+      _calculateEstimatedInterest = _calculateEstimatedInterest || core.calculateEstimatedInterest;
     }
   } catch (e) {}
   try {
@@ -479,6 +481,43 @@ function getLivingStandardHelper(regionCode) {
 }
 
 /**
+ * 強制執行的執行標的金額（計算執行費用）
+ * 司法院：執行費以執行標的金額為準，「應併算附帶請求之利息、違約金等至聲請強制執行前一日」。
+ * = 本金 + 前欠利息、違約金 + 自書狀利息（違約金）起算日至聲請前一日的利息、違約金（以年息 ÷ 365 按日估算）
+ * 起算日與「聲請執行之事項」相同（buildClaimItems）：借據起算日與前欠計算至次日取較晚者。
+ * 有前欠金額卻沒填計算至日時，無法判斷其後從哪天起算，不估算其後利息（書狀上該日以「○」待填）。
+ * @param {string} filingDateStr 聲請日（書狀日期，YYYY-MM-DD）
+ */
+function estimateExecutionBase(data, filingDateStr) {
+  const principal = Number(data.principal) || 0;
+  const manualInterest = Number(data.manualInterest) || 0;
+  const manualPenalty = Number(data.manualPenalty) || 0;
+  const rate = Number(data.interestRate) || 0;
+  const ratio = Number(String(data.penaltyRatio ?? '').trim()) || 0;
+  const hasArrears = manualInterest > 0 || manualPenalty > 0;
+  const cutoff = hasArrears ? String(data.interestCutoffDate || '') : '';
+  const dayAfterCutoff = cutoff ? addDaysHelper(cutoff, 1) : '';
+  const interestStart = laterDateStrHelper(data.interestStartDate || data.lastPaymentDate, dayAfterCutoff);
+  const penaltyStart = data.penaltyStartDate ? laterDateStrHelper(data.penaltyStartDate, dayAfterCutoff) : interestStart;
+
+  const canAccrue = principal > 0 && rate > 0 && !!interestStart && !!filingDateStr && !(hasArrears && !cutoff) && !!_calculateEstimatedInterest;
+  const interestUntil = (start) => (canAccrue && start && start < filingDateStr)
+    ? _calculateEstimatedInterest(principal, rate, start, filingDateStr).interest
+    : 0;
+  const accruedInterest = interestUntil(interestStart);
+  const accruedPenalty = ratio > 0 ? Math.round(interestUntil(penaltyStart) * ratio / 100) : 0;
+  const accrued = canAccrue && interestStart < filingDateStr;
+
+  return {
+    principal,
+    extras: manualInterest + manualPenalty + accruedInterest + accruedPenalty,
+    total: principal + manualInterest + manualPenalty + accruedInterest + accruedPenalty,
+    // 利息、違約金計算至哪一天：有估算到聲請前一日者為聲請前一日，否則為前欠的計算至日（未填以「○」）
+    untilDateStr: accrued ? addDaysHelper(filingDateStr, -1) : cutoff
+  };
+}
+
+/**
  * 2. 產生《民事強制執行聲請狀》（單一書狀，勾選標的後自動補上各標的對應的第三人與證物）
  * 標的措辭沿用附件：薪資（1/3、按月移轉、保留 1.2 倍最低生活費）、銀行存款、郵局存款、
  * 股票（集保）、勞保局查投保單位、動產、不動產；另保留壽險解約金、國稅局查調
@@ -486,15 +525,19 @@ function getLivingStandardHelper(regionCode) {
 function generateExecutionDoc(data) {
   const roc = getRocDateHelper();
   const principal = Number(data.principal) || 0;
-  const manualInterest = Number(data.manualInterest) || 0;
-  const manualPenalty = Number(data.manualPenalty) || 0;
-  const totalClaim = principal + manualInterest + manualPenalty;
 
+  // 執行標的金額含利息、違約金至聲請前一日（以書狀日期為聲請日），執行費依此計算
+  const filingDateStr = data.filingDate || roc.dateString || '';
+  const base = estimateExecutionBase(data, filingDateStr);
+  const totalClaim = base.total;
   const totalClaimChinese = chineseMoneyOrBlankHelper(totalClaim);
   const principalChinese = chineseMoneyOrBlankHelper(principal);
+  const baseBreakdown = (principal > 0 && base.extras > 0)
+    ? `；本金 ${principal.toLocaleString()} 元，及利息、違約金計算至 ${rocDateOrBlankHelper(base.untilDateStr)} 止 ${base.extras.toLocaleString()} 元`
+    : '';
   const executionFee = calculateCourtFeesHelper(totalClaim, 'execution');
   const executionFeeText = totalClaim > 0
-    ? `新臺幣 ${executionFee.toLocaleString()} 元（按請求金額千分之八計算${executionFee === 0 ? '，未滿五千元免徵' : ''}）`
+    ? `新臺幣 ${executionFee.toLocaleString()} 元（按執行標的金額每百元 8 角計算，不滿百元以百元計${executionFee === 0 ? '；未滿五千元免徵' : ''}）`
     : '新臺幣 ○○○ 元';
   const titleType = resolveTitleType(data.titleType);
   const creditorName = data.creditorName || '○○縣○○儲蓄互助社';
@@ -601,7 +644,7 @@ function generateExecutionDoc(data) {
   }
 
   const docText = `民事強制執行聲請狀
-執行標的金額：${totalClaimChinese}（小寫：新臺幣 ${numberOrBlankHelper(totalClaim)} 元）
+執行標的金額：${totalClaimChinese}（小寫：新臺幣 ${numberOrBlankHelper(totalClaim)} 元${baseBreakdown}）
 執行規費：${executionFeeText}
 
 債權人：${creditorName}
@@ -759,5 +802,6 @@ if (typeof module !== 'undefined' && module.exports) {
     collectThirdParties,
     generateExecutionDoc,
     generateRenewCertificateDoc,
+    estimateExecutionBase,
   };
 }

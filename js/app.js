@@ -541,7 +541,8 @@ function initDocGenerator() {
         debtorName: debtorName,
         debtorId: document.getElementById('docDebtorId')?.value.trim() || '',
         principal: Number(document.getElementById('docPrincipal')?.value) || 0,
-        courtName: document.getElementById('docCourt')?.value || '臺中',
+        // 沒選法院就留空，由使用者在台帳視窗選擇；不可預設臺中，否則換證狀會寫成臺中地院
+        courtName: document.getElementById('docCourt')?.value || '',
         certNo: document.getElementById('docTitleCaseNo')?.value.trim() || document.getElementById('docCaseNo')?.value.trim() || '',
         issueDate: '',
         guarantorName: document.getElementById('docGuarantorName')?.value.trim() || '',
@@ -1254,7 +1255,7 @@ function renderLedgerTable(query = '', filterStatus = 'all') {
         <div style="font-size:0.8rem; color:var(--muted);">${escapeHtml(r.debtorId)}</div>
       </td>
       <td>${escapeHtml(r.certNo) || '未填'}</td>
-      <td>${escapeHtml(r.courtName) || '臺中'}</td>
+      <td>${escapeHtml(r.courtName) || '<span style="color:#DC2626;">未填</span>'}</td>
       <td><strong>NT$ ${Number(r.principal || 0).toLocaleString()}</strong></td>
       <td>${escapeHtml(r.issueDate)}</td>
       <td style="min-width:180px;">
@@ -1348,7 +1349,8 @@ function openRecordModal(record = null) {
   document.getElementById('modalDebtorName').value = field('debtorName');
   document.getElementById('modalDebtorId').value = field('debtorId');
   document.getElementById('modalCertNo').value = field('certNo');
-  document.getElementById('modalCourtName').value = record ? (record.courtName || '臺中') : '臺中';
+  // 法院不預設：預設臺中會讓其他縣市的案件一不注意就存成臺中地院（必選欄位）
+  document.getElementById('modalCourtName').value = field('courtName');
   document.getElementById('modalPrincipal').value = field('principal');
   // 核發日不預填今天：5 年預警日由此起算，忘了改會讓預警延後，空白則必須填寫才能存檔
   document.getElementById('modalIssueDate').value = field('issueDate');

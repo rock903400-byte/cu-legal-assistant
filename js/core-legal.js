@@ -328,16 +328,21 @@ function calculateEstimatedInterest(principal, annualRatePercent, startDateStr, 
 
 /**
  * 計算法院訴訟及強制執行規費
+ * 強制執行：強制執行法第 28 條之 2 第 1 項「未滿新臺幣五千元者，免徵執行費；五千元以上者，每百元收七角，
+ * 其畸零之數不滿百元者，以百元計算」，再依《臺灣高等法院民事訴訟、強制執行費用提高徵收額數標準》第 4 條
+ * 加徵七分之一，即每百元八角（司法院常見問答同此）。
+ * 元以下（角）的處理查無官方規定，採「寧多勿少」無條件進位到元：少繳會被命補正，多 1 元無礙。
  */
 function calculateCourtFees(claimAmount, docType = 'execution') {
   if (docType === 'payment_order') {
     return 500; // 支付命令聲請規費固定 500 元
   }
-  
-  // 強制執行規費 (未滿 5000 元免徵；5000 元以上按千分之八計算)
+
   const amount = Number(claimAmount) || 0;
   if (amount < 5000) return 0;
-  return Math.floor(amount * 0.008);
+  const hundreds = Math.ceil(amount / 100);
+  // 以「角」為單位計算避免浮點誤差：每百元 8 角
+  return Math.ceil((hundreds * 8) / 10);
 }
 
 /**

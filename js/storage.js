@@ -254,7 +254,7 @@ function buildRenewFormFromRecord(record) {
     docDebtorId: r.debtorId || '',
     docDebtorAddress: '',
     docPrincipal: r.principal || 0,
-    docCourt: r.courtName || '臺中',
+    docCourt: r.courtName || '',
     docHasGuarantor: !!r.guarantorName,
     docGuarantorName: r.guarantorName || '',
     docGuarantorId: '',
@@ -572,7 +572,7 @@ function exportRecordsToCSV(records) {
 function exportRecordsToJSON(records) {
   const data = {
     exportedAt: new Date().toISOString(),
-    version: '2.3.3',
+    version: '2.3.4',
     profile: loadCuProfile(),
     records: records
   };

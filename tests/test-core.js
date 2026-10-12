@@ -954,4 +954,64 @@ check18('填入範例前先確認', () => {
 assert.deepStrictEqual(fullReviewFailures, [], `全端 review 修正測試未通過（${fullReviewFailures.length} 項）：\n- ${fullReviewFailures.join('\n- ')}`);
 console.log('  ✅ 全端 review 修正測試通過');
 
+// 19. 執行費、預設法院、常見問答（2026-10-12 第二批）
+console.log('\n19. 執行費依官方算法、法院不預設、常見問答更正');
+const batch19Failures = [];
+const check19 = (desc, fn) => {
+  try {
+    if (!fn()) batch19Failures.push(desc);
+  } catch (e) {
+    batch19Failures.push(`${desc}（${e.message}）`);
+  }
+};
+
+// 19.1 強制執行法第 28 條之 2：每百元七角、不滿百元以百元計；高等法院標準第 4 條加徵七分之一 → 每百元八角
+[[4999, 0], [5000, 40], [5001, 41], [5099, 41], [5100, 41], [123456, 988], [341500, 2732]].forEach(([amount, fee]) =>
+  check19(`執行費：${amount} 元 → ${fee} 元`, () => calculateCourtFees(amount, 'execution') === fee));
+
+// 19.2 執行標的金額併算利息、違約金至聲請前一日（司法院說明）
+const execBase19 = {
+  principal: 320000, interestRate: '6', lastPaymentDate: '2023-08-10', interestStartDate: '2023-08-11',
+  manualInterest: 18500, manualPenalty: 3000, interestCutoffDate: '2024-07-31', courtName: '臺中', filingDate: '2026-10-12',
+  targets: { bankDeposit: true }
+};
+const templates19 = require('../js/templates');
+check19('前欠算到 2024/7/31：其後利息估算至聲請前一日', () => {
+  const b = templates19.estimateExecutionBase(execBase19, '2026-10-12');
+  // 2024-08-01～2026-10-11 共 802 天：320,000 × 6% ÷ 365 × 802 ≒ 42,187
+  return b.total === 383687 && b.untilDateStr === '2026-10-11';
+});
+check19('有違約金比例時一併估算違約金', () =>
+  templates19.estimateExecutionBase({ ...execBase19, penaltyRatio: '10' }, '2026-10-12').total === 387906);
+const execDoc19 = generateExecutionDoc(execBase19);
+check19('書狀的執行標的金額寫出本金與利息違約金計算至聲請前一日', () =>
+  execDoc19.includes('小寫：新臺幣 383,687 元；本金 320,000 元，及利息、違約金計算至 民國 115 年 10 月 11 日 止 63,687 元'));
+check19('執行規費依執行標的金額計算', () =>
+  execDoc19.includes('執行規費：新臺幣 3,070 元（按執行標的金額每百元 8 角計算，不滿百元以百元計）'));
+check19('有前欠金額卻沒填計算至日：不估算其後利息，日期以「○」待填', () => {
+  const b = templates19.estimateExecutionBase({ ...execBase19, interestCutoffDate: '' }, '2026-10-12');
+  const doc = generateExecutionDoc({ ...execBase19, interestCutoffDate: '' });
+  return b.total === 341500 && doc.includes('計算至 民國 ○○ 年 ○○ 月 ○○ 日 止 21,500 元');
+});
+check19('利息起算日在聲請日之後：不估算利息', () =>
+  templates19.estimateExecutionBase({ principal: 100000, interestRate: '10', interestStartDate: '2026-10-20' }, '2026-10-12').total === 100000);
+check19('未滿五千元免徵', () =>
+  generateExecutionDoc({ principal: 4000, courtName: '臺中', filingDate: '2026-10-12', targets: {} }).includes('執行規費：新臺幣 0 元（按執行標的金額每百元 8 角計算，不滿百元以百元計；未滿五千元免徵）'));
+
+// 19.3 台帳與換證不預設「臺中」
+check19('換證：台帳沒有法院時不帶入臺中', () => storageModule.buildRenewFormFromRecord({ debtorName: '甲' }).docCourt === '');
+check19('從書狀存入台帳：沒選法院時留空', () => appSrc.includes("courtName: document.getElementById('docCourt')?.value || '',"));
+check19('台帳視窗：法院不預設、必須選擇', () =>
+  fnBody(appSrc, 'openRecordModal').includes("getElementById('modalCourtName').value = field('courtName')") &&
+  /<select id="modalCourtName" class="form-control" required>\s*<option value="">/.test(reviewHtml));
+check19('台帳表格：沒有法院顯示「未填」', () => !fnBody(appSrc, 'renderLedgerTable').includes("|| '臺中'"));
+
+// 19.4 常見問答（目前隱藏）不得有錯誤說法或未轉換的 Markdown
+check19('問答不再宣稱違約金加利息合計 16% 且系統已內建防呆', () => !reviewHtml.includes('內建防呆') && !reviewHtml.includes('總請求之年利率上限'));
+check19('問答引用民法第 252 條違約金酌減', () => reviewHtml.includes('法院得依民法第 252 條減至相當之數額'));
+check19('問答沒有原樣顯示的 **', () => !reviewHtml.includes('**'));
+
+assert.deepStrictEqual(batch19Failures, [], `第 19 段測試未通過（${batch19Failures.length} 項）：\n- ${batch19Failures.join('\n- ')}`);
+console.log('  ✅ 執行費、預設法院、常見問答測試通過');
+
 console.log('\n🎉 所有全面升級單元測試全數驗證通過！');
