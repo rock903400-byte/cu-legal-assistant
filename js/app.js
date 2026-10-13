@@ -797,6 +797,7 @@ function updateDocPreview() {
 
   currentRawDocText = text;
   updateLetterAids(data, text);
+  updateCertFeeHint(data);
 
   const previewEl = document.getElementById('docPreviewText');
   if (previewEl) {
@@ -820,6 +821,29 @@ function updateDocPreview() {
   const chineseEl = document.getElementById('chineseAmountHint');
   if (chineseEl) {
     chineseEl.textContent = `合計：${toChineseCurrency(total)}（本金：${p.toLocaleString()}，利息：${mi.toLocaleString()}，違約金：${mp.toLocaleString()}）`;
+  }
+}
+
+/**
+ * 強制執行狀的執行名義為債權憑證時，書狀的執行規費留待填寫（templates.js），這裡顯示全額試算與補繳差額的說明
+ * 強制執行法第 28 條之 3 第 3 項：持憑證聲請強制執行債務人財產者，補徵按第 28 條之 2 第 1 項計算之執行費差額
+ */
+function updateCertFeeHint(data) {
+  const box = document.getElementById('certFeeHint');
+  if (!box) return;
+  const visible = data.docType === 'execution' && data.titleType === 'cert';
+  box.style.display = visible ? 'block' : 'none';
+  if (!visible) return;
+
+  // 與書狀相同的聲請日（書狀日期）與執行標的金額
+  const base = estimateExecutionBase(data, data.filingDate || todayLocalDateStr());
+  const fee = calculateCourtFees(base.total, 'execution');
+  if (base.total <= 0) {
+    box.textContent = '💡 執行名義為債權憑證：依強制執行法第 28 條之 3，先前已繳納的執行費可以扣除，只需補繳差額，書狀的「執行規費」因此留空待填。填入本金後，這裡會顯示全額試算。';
+  } else if (fee === 0) {
+    box.textContent = `💡 執行標的金額 ${base.total.toLocaleString()} 元未滿五千元，免徵執行費。`;
+  } else {
+    box.textContent = `💡 執行名義為債權憑證：依強制執行法第 28 條之 3，先前已繳納的執行費可以扣除，只需補繳差額，書狀的「執行規費」因此留空待填。依本件執行標的金額 ${base.total.toLocaleString()} 元試算，全額為 ${fee.toLocaleString()} 元；請扣除債權憑證上記載的已繳執行費後填寫，實際金額以執行處核算為準。`;
   }
 }
 

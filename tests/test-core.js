@@ -1014,4 +1014,60 @@ check19('問答沒有原樣顯示的 **', () => !reviewHtml.includes('**'));
 assert.deepStrictEqual(batch19Failures, [], `第 19 段測試未通過（${batch19Failures.length} 項）：\n- ${batch19Failures.join('\n- ')}`);
 console.log('  ✅ 執行費、預設法院、常見問答測試通過');
 
+// 20. 執行名義為債權憑證：強制執行法第 28 條之 3 只補繳差額，書狀執行規費留待填寫（2026-10-13）
+console.log('\n20. 債權憑證強制執行的執行規費');
+const batch20Failures = [];
+const check20 = (desc, fn) => {
+  try {
+    if (!fn()) batch20Failures.push(desc);
+  } catch (e) {
+    batch20Failures.push(`${desc}（${e.message}）`);
+  }
+};
+const feeLine20 = (doc) => doc.split('\n').find(l => l.startsWith('執行規費：'));
+
+// 20.1 書狀：債權憑證不印全額；支付命令、判決照舊
+const certDoc20 = generateExecutionDoc({ ...execBase19, titleType: 'cert' });
+check20('債權憑證：執行規費留待填寫', () => feeLine20(certDoc20) === '執行規費：新臺幣 ○○○ 元');
+check20('債權憑證：執行標的金額仍寫出本金與利息違約金', () =>
+  certDoc20.includes('小寫：新臺幣 383,687 元；本金 320,000 元，及利息、違約金計算至 民國 115 年 10 月 11 日 止 63,687 元'));
+['payment_order', 'judgment'].forEach(tt => check20(`執行名義 ${tt}：執行規費照舊印全額`, () =>
+  feeLine20(generateExecutionDoc({ ...execBase19, titleType: tt })) === '執行規費：新臺幣 3,070 元（按執行標的金額每百元 8 角計算，不滿百元以百元計）'));
+check20('債權憑證但未滿五千元：照舊印免徵', () =>
+  feeLine20(generateExecutionDoc({ principal: 4000, titleType: 'cert', filingDate: '2026-10-12', targets: {} })) ===
+  '執行規費：新臺幣 0 元（按執行標的金額每百元 8 角計算，不滿百元以百元計；未滿五千元免徵）');
+
+// 20.2 畫面提示：以 app.js 的 updateCertFeeHint 原始碼搭配假的 document 執行
+const vm20 = require('vm');
+const hintBox20 = { style: {}, textContent: '' };
+const hintCtx20 = vm20.createContext({
+  document: { getElementById: (id) => (id === 'certFeeHint' ? hintBox20 : null) },
+  estimateExecutionBase: templates19.estimateExecutionBase,
+  calculateCourtFees,
+  todayLocalDateStr: () => '2026-10-12'
+});
+vm20.runInContext(fnBody(appSrc, 'updateCertFeeHint'), hintCtx20);
+const runHint20 = (data) => {
+  hintBox20.style = {};
+  hintBox20.textContent = '';
+  hintCtx20.updateCertFeeHint(data);
+  return hintBox20;
+};
+check20('提示：強執＋債權憑證時顯示全額試算與補繳差額說明', () => {
+  const box = runHint20({ ...execBase19, docType: 'execution', titleType: 'cert', filingDate: undefined });
+  return box.style.display === 'block' && box.textContent.includes('第 28 條之 3') &&
+    box.textContent.includes('執行標的金額 383,687 元試算，全額為 3,070 元') && box.textContent.includes('扣除債權憑證上記載的已繳執行費');
+});
+check20('提示：執行名義為支付命令時不顯示', () =>
+  runHint20({ ...execBase19, docType: 'execution', titleType: 'payment_order' }).style.display === 'none');
+check20('提示：換發債權憑證狀不顯示', () =>
+  runHint20({ ...execBase19, docType: 'renew_cert', titleType: 'cert' }).style.display === 'none');
+check20('提示：未滿五千元時說明免徵', () =>
+  runHint20({ principal: 4000, docType: 'execution', titleType: 'cert' }).textContent.includes('未滿五千元，免徵執行費'));
+check20('預覽更新時同步更新提示，且畫面有提示欄位', () =>
+  fnBody(appSrc, 'updateDocPreview').includes('updateCertFeeHint(data)') && reviewHtml.includes('id="certFeeHint"'));
+
+assert.deepStrictEqual(batch20Failures, [], `第 20 段測試未通過（${batch20Failures.length} 項）：\n- ${batch20Failures.join('\n- ')}`);
+console.log('  ✅ 債權憑證強制執行的執行規費測試通過');
+
 console.log('\n🎉 所有全面升級單元測試全數驗證通過！');

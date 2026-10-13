@@ -572,7 +572,7 @@ function exportRecordsToCSV(records) {
 function exportRecordsToJSON(records) {
   const data = {
     exportedAt: new Date().toISOString(),
-    version: '2.3.4',
+    version: '2.3.5',
     profile: loadCuProfile(),
     records: records
   };

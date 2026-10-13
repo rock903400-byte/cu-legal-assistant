@@ -535,11 +535,14 @@ function generateExecutionDoc(data) {
   const baseBreakdown = (principal > 0 && base.extras > 0)
     ? `；本金 ${principal.toLocaleString()} 元，及利息、違約金計算至 ${rocDateOrBlankHelper(base.untilDateStr)} 止 ${base.extras.toLocaleString()} 元`
     : '';
+  const titleType = resolveTitleType(data.titleType);
   const executionFee = calculateCourtFeesHelper(totalClaim, 'execution');
-  const executionFeeText = totalClaim > 0
+  // 執行名義為債權憑證：強制執行法第 28 條之 3 第 3 項，只補繳按第 28 條之 2 第 1 項計算之執行費「差額」。
+  // 先前已繳多少記載於債權憑證、系統無從得知，印全額會多繳，因此留待填寫（全額試算顯示於畫面提示）；
+  // 未滿五千元者全額即為 0、差額亦為 0，照常印免徵
+  const executionFeeText = (totalClaim > 0 && !(titleType.isCert && executionFee > 0))
     ? `新臺幣 ${executionFee.toLocaleString()} 元（按執行標的金額每百元 8 角計算，不滿百元以百元計${executionFee === 0 ? '；未滿五千元免徵' : ''}）`
     : '新臺幣 ○○○ 元';
-  const titleType = resolveTitleType(data.titleType);
   const creditorName = data.creditorName || '○○縣○○儲蓄互助社';
   const titleCaseNo = data.titleCaseNo || '○○ 年度 ○ 字第 ○○○○ 號';
 
